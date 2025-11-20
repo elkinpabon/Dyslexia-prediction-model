@@ -11,7 +11,14 @@ import '../results/round_results_screen.dart';
 /// Métricas: Clicks (toques), Hits (correctos), Misses (falsos positivos)
 
 class SpeedRoundsActivityScreen extends StatefulWidget {
-  const SpeedRoundsActivityScreen({super.key});
+  final String userId;
+  final String childId;
+
+  const SpeedRoundsActivityScreen({
+    super.key,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   State<SpeedRoundsActivityScreen> createState() =>
@@ -256,7 +263,13 @@ class _SpeedRoundsActivityScreenState extends State<SpeedRoundsActivityScreen>
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => RoundResultsScreen(result: result)),
+        MaterialPageRoute(
+          builder: (_) => RoundResultsScreen(
+            result: result,
+            userId: widget.userId,
+            childId: widget.childId,
+          ),
+        ),
       );
     }
   }

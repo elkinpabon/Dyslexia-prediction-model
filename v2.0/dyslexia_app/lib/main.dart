@@ -3,7 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/profile/profile_management_screen.dart';
+import 'screens/profile/child_profile_screen.dart';
 import 'services/db/storage_service.dart';
+import 'services/db/database_service.dart';
 import 'services/api_service.dart';
 import 'services/audio/audio_service.dart';
 
@@ -22,10 +28,25 @@ void main() async {
     overlays: [],
   );
 
-  // Inicializar servicios
-  await StorageService().initialize();
-  await AudioService().initializeTts();
-  await ApiService().checkHealth();
+  // Inicializar servicios (de forma segura)
+  try {
+    await StorageService().initialize();
+  } catch (e) {
+    print('Error inicializando StorageService: $e');
+  }
+
+  try {
+    await AudioService().initializeTts();
+  } catch (e) {
+    print('Error inicializando AudioService: $e');
+  }
+
+  // Inicializar DatabaseService al final (requiere otros servicios)
+  try {
+    await DatabaseService().database;
+  } catch (e) {
+    print('Error inicializando DatabaseService: $e');
+  }
 
   runApp(const DyslexiaApp());
 }
@@ -40,9 +61,10 @@ class DyslexiaApp extends StatelessWidget {
         Provider<ApiService>(create: (_) => ApiService()),
         Provider<AudioService>(create: (_) => AudioService()),
         Provider<StorageService>(create: (_) => StorageService()),
+        Provider<DatabaseService>(create: (_) => DatabaseService()),
       ],
       child: MaterialApp(
-        title: 'Prototipo Dislexia',
+        title: 'DyslexiaApp',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -50,8 +72,6 @@ class DyslexiaApp extends StatelessWidget {
             seedColor: const Color(0xFF2196F3),
             brightness: Brightness.light,
           ),
-          // Lexend: Fuente de Google diseñada específicamente para dislexia
-          // Ofrece mayor legibilidad con espaciado optimizado y diferenciación de caracteres
           textTheme: GoogleFonts.lexendTextTheme(
             const TextTheme(
               displayLarge: TextStyle(
@@ -158,7 +178,39 @@ class DyslexiaApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const HomeScreen(),
+        home: const LoginScreen(),
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/home': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            if (args is String) {
+              return HomeScreen(userId: args);
+            }
+            return const HomeScreen();
+          },
+          '/profile': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            if (args is String) {
+              return ProfileScreen(userId: args);
+            }
+            return const ProfileScreen(userId: '');
+          },
+          '/profile-management': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            if (args is String) {
+              return ProfileManagementScreen(userId: args);
+            }
+            return const ProfileManagementScreen(userId: '');
+          },
+          '/child-profile': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            if (args is String) {
+              return ChildProfileScreen(childId: args);
+            }
+            return const ChildProfileScreen(childId: '');
+          },
+        },
       ),
     );
   }

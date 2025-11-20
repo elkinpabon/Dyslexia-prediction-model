@@ -7,26 +7,15 @@ import '../../../services/audio/audio_service.dart';
 import '../../../widgets/loading_overlay.dart';
 import '../../results/round_results_screen.dart';
 
-/// Test de Cribado de Dislexia - 48 Tareas con Dificultad Progresiva
-/// Basado en dataset Dyt-desktop y DytectiveU (PLOS ONE)
-/// Genera features avanzados para predicción ML
-///
-/// CATEGORÍAS (Dificultad Progresiva):
-/// - Discriminación Visual (8): Cuadrícula creciente 3x2 → 6x6
-/// - Correspondencia Auditiva (8): Sonidos a letras
-/// - Memoria Secuencial (8): Secuencias 2-5 elementos
-/// - Dictado (8): Palabras simples → complejas
-/// - Velocidad/Gramática (4): Detección de errores
-/// - Identificar Letra Incorrecta (6): Palabras con intruso
-/// - Completar Palabra (6): Falta una letra
-///
-/// CARACTERÍSTICAS:
-/// - Dificultad progresiva adaptativa
-/// - Test de cribado neutro (sin feedback de respuestas)
-/// - Fuente Lexend optimizada para dislexia
-/// - Métricas avanzadas para ML
 class ScreeningTestScreen extends StatefulWidget {
-  const ScreeningTestScreen({super.key});
+  final String userId;
+  final String childId;
+
+  const ScreeningTestScreen({
+    super.key,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   State<ScreeningTestScreen> createState() => _ScreeningTestScreenState();
@@ -734,23 +723,21 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
 
     setState(() {});
 
-    // Verificar si es correcto para métricas internas
-    final isCorrect = letter == sequence[currentIndex];
+    // Verificar si es correcto solo si no excedemos el tamaño de la secuencia
+    if (currentIndex < sequence.length) {
+      final isCorrect = letter == sequence[currentIndex];
 
-    if (isCorrect) {
-      // Si completó la secuencia
-      if (userInput.length == sequence.length) {
+      if (isCorrect) {
         _currentHits++;
-        await Future.delayed(const Duration(milliseconds: 300));
-        await _completeTask();
+      } else {
+        _currentMisses++;
       }
-    } else {
-      _currentMisses++;
-      // Si hay error, permitir completar el intento actual
-      if (userInput.length == sequence.length) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        await _completeTask();
-      }
+    }
+
+    // Si completó la secuencia (correcta o incorrectamente)
+    if (userInput.length >= sequence.length) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _completeTask();
     }
   }
 
@@ -934,71 +921,75 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
               // Teclado de letras en cuadrícula compacta
               Container(
                 constraints: const BoxConstraints(maxWidth: 700),
-                child: GridView.count(
+                child: GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 9, // 9 columnas para todas las letras
-                  childAspectRatio: 1.0,
-                  crossAxisSpacing: 6,
-                  mainAxisSpacing: 6,
-                  children:
-                      [
-                        'a',
-                        'b',
-                        'c',
-                        'd',
-                        'e',
-                        'f',
-                        'g',
-                        'h',
-                        'i',
-                        'j',
-                        'k',
-                        'l',
-                        'm',
-                        'n',
-                        'ñ',
-                        'o',
-                        'p',
-                        'q',
-                        'r',
-                        's',
-                        't',
-                        'u',
-                        'v',
-                        'w',
-                        'x',
-                        'y',
-                        'z',
-                      ].map((letter) {
-                        return Material(
-                          color: Colors.white,
-                          elevation: 3,
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            onTap: () => _handleMemoryInput(letter),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 9, // 9 columnas para todas las letras
+                    childAspectRatio: 1.0,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                  ),
+                  itemCount: 27, // Total de letras del alfabeto español
+                  itemBuilder: (context, index) {
+                    final letters = [
+                      'a',
+                      'b',
+                      'c',
+                      'd',
+                      'e',
+                      'f',
+                      'g',
+                      'h',
+                      'i',
+                      'j',
+                      'k',
+                      'l',
+                      'm',
+                      'n',
+                      'ñ',
+                      'o',
+                      'p',
+                      'q',
+                      'r',
+                      's',
+                      't',
+                      'u',
+                      'v',
+                      'w',
+                      'x',
+                      'y',
+                      'z',
+                    ];
+                    final letter = letters[index];
+                    return Material(
+                      color: Colors.white,
+                      elevation: 3,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        onTap: () => _handleMemoryInput(letter),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.orange.shade300,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Text(
-                                letter.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade900,
-                                ),
-                              ),
+                            border: Border.all(
+                              color: Colors.orange.shade300,
+                              width: 2,
                             ),
                           ),
-                        );
-                      }).toList(),
+                          child: Text(
+                            letter.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -1753,36 +1744,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     );
   }
 
-  // ========== FEEDBACK VISUAL ANIMADO ==========
-  Future<void> _showFeedbackAnimation(
-    String message,
-    Color color, {
-    int duration = 1500,
-  }) async {
-    setState(() {
-      _feedbackMessage = message;
-      _feedbackColor = color;
-      _showFeedback = true;
-    });
-
-    final audioService = context.read<AudioService>();
-    if (color == Colors.green) {
-      // Sonido de éxito (pitch más alto)
-      await audioService.speak('correcto', pitch: 1.2);
-    } else if (color == Colors.red) {
-      // Sonido de error (pitch más bajo)
-      await audioService.speak('error', pitch: 0.8);
-    }
-
-    await Future.delayed(Duration(milliseconds: duration));
-
-    if (mounted) {
-      setState(() {
-        _showFeedback = false;
-      });
-    }
-  }
-
   // ========== COMPLETAR TAREA ==========
   Future<void> _completeTask() async {
     if (_isProcessing) return;
@@ -1844,6 +1805,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     final activityResult = ActivityRoundResult(
       activityId: 'screening_test',
       activityName: 'Test de Cribado',
+      childId: widget.childId,
       rounds: _completedRounds,
       startTime: _sessionStartTime ?? endTime,
       endTime: endTime,
@@ -1852,7 +1814,11 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => RoundResultsScreen(result: activityResult),
+        builder: (context) => RoundResultsScreen(
+          result: activityResult,
+          userId: widget.userId,
+          childId: widget.childId,
+        ),
       ),
     );
   }

@@ -52,6 +52,8 @@ class AppConstants {
   static const String keyFirstLaunch = "first_launch";
   static const String keySoundEnabled = "sound_enabled";
   static const String keyVoiceEnabled = "voice_enabled";
+  static const String keyUserId = "user_id";
+  static const String keyIsLoggedIn = "is_logged_in";
 
   // Animations
   static const Duration animationDuration = Duration(milliseconds: 300);

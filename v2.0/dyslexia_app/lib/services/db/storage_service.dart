@@ -184,6 +184,23 @@ class StorageService {
     await prefs.setBool(AppConstants.keyVoiceEnabled, enabled);
   }
 
+  // ==================== CHILD PROFILE SELECTION ====================
+
+  /// Obtener ID del niño seleccionado
+  String? getSelectedChildId() {
+    return prefs.getString('selected_child_id');
+  }
+
+  /// Guardar ID del niño seleccionado
+  Future<void> setSelectedChildId(String childId) async {
+    await prefs.setString('selected_child_id', childId);
+  }
+
+  /// Limpiar selección de niño
+  Future<void> clearSelectedChild() async {
+    await prefs.remove('selected_child_id');
+  }
+
   // ==================== CLEAR ALL ====================
 
   /// Limpiar todos los datos

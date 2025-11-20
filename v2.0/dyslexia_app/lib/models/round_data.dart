@@ -70,6 +70,7 @@ class RoundData {
 class ActivityRoundResult {
   final String activityId;
   final String activityName;
+  final String? childId;
   final List<RoundData> rounds;
   final DateTime startTime;
   final DateTime endTime;
@@ -78,6 +79,7 @@ class ActivityRoundResult {
   ActivityRoundResult({
     required this.activityId,
     required this.activityName,
+    this.childId,
     required this.rounds,
     required this.startTime,
     required this.endTime,
@@ -101,6 +103,7 @@ class ActivityRoundResult {
   Map<String, dynamic> toJson() => {
     'activity_id': activityId,
     'activity_name': activityName,
+    'child_id': childId,
     'rounds': rounds.map((r) => r.toJson()).toList(),
     'start_time': startTime.toIso8601String(),
     'end_time': endTime.toIso8601String(),
@@ -117,6 +120,7 @@ class ActivityRoundResult {
       ActivityRoundResult(
         activityId: json['activity_id'],
         activityName: json['activity_name'],
+        childId: json['child_id'],
         rounds: (json['rounds'] as List)
             .map((r) => RoundData.fromJson(r))
             .toList(),

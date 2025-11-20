@@ -160,6 +160,10 @@ class ApiService {
   Future<Map<String, dynamic>?> evaluateAllActivities({
     required Map<String, dynamic> userData,
     required List<ActivityRoundResult> completedActivities,
+    String? userId,
+    String? childId,
+    String? userName,
+    String? childName,
   }) async {
     try {
       _logger.i(
@@ -168,6 +172,10 @@ class ApiService {
 
       // Construir formato esperado por el backend
       final requestData = {
+        'userId': userId ?? 'user_${DateTime.now().millisecondsSinceEpoch}',
+        'childId': childId,
+        'userName': userName ?? 'Usuario Tablet',
+        'childName': childName ?? 'Niño',
         'user': {
           'gender': userData['gender'] ?? 'Male',
           'age': userData['age'] ?? 8,
@@ -191,7 +199,15 @@ class ApiService {
         }).toList(),
       };
 
-      _logger.d('Request data: ${jsonEncode(requestData)}');
+      _logger.i('📤 Enviando al backend:');
+      _logger.i('   User: ${requestData['user']}');
+      _logger.i('   Activities: ${(requestData['activities'] as List).length}');
+      for (var activity in (requestData['activities'] as List)) {
+        _logger.i(
+          '   - ${activity['name']}: ${(activity['rounds'] as List).length} rondas',
+        );
+      }
+      _logger.d('Request completo: ${jsonEncode(requestData)}');
 
       final response = await http
           .post(

@@ -50,6 +50,8 @@ dependencies:
   
   # Almacenamiento local
   shared_preferences: ^2.3.2
+  sqflite: ^2.3.0
+  path: ^1.9.0
   
   # UI y animaciones
   animations: ^2.0.11

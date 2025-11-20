@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../models/round_data.dart';
 import '../../services/api_service.dart';
 import '../../services/audio/audio_service.dart';
-import '../../services/db/storage_service.dart';
+import '../../services/db/database_service.dart';
 import '../../constants/app_constants.dart';
 import '../../models/activity_result.dart';
 import '../../widgets/loading_overlay.dart';
@@ -12,8 +12,15 @@ import '../../widgets/loading_overlay.dart';
 /// Pantalla de resultados finales de las 10 rondas
 class RoundResultsScreen extends StatefulWidget {
   final ActivityRoundResult result;
+  final String userId;
+  final String childId;
 
-  const RoundResultsScreen({super.key, required this.result});
+  const RoundResultsScreen({
+    super.key,
+    required this.result,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   State<RoundResultsScreen> createState() => _RoundResultsScreenState();
@@ -55,39 +62,116 @@ class _RoundResultsScreenState extends State<RoundResultsScreen>
 
       // TODO: Obtener datos del usuario (edad, género, etc.)
       // Por ahora usamos valores por defecto
+      // Obtener información del niño desde la base de datos
+      final dbService = DatabaseService();
+
+      if (widget.result.childId == null) {
+        throw Exception('El resultado no tiene un ID de niño asociado');
+      }
+
+      final child = await dbService.getChildById(widget.result.childId!);
+
+      if (child == null) {
+        throw Exception('No se encontró el perfil del niño');
+      }
+
+      // Obtener información del padre/tutor
+      final tutor = await dbService.getUserById(child.tutorId);
+      final tutorName = tutor?.name ?? 'Usuario Desconocido';
+
+      // Preparar datos del niño para enviar al backend
       final userData = {
-        'gender': 'Male',
-        'age': 8,
+        'gender':
+            'Male', // Puedes agregar género al perfil del niño si lo necesitas
+        'age': child.age,
         'native_lang': true,
         'other_lang': false,
       };
 
-      // Enviar datos al modelo ML usando el nuevo formato
+      // Enviar datos al modelo ML usando IDs reales de la base de datos local
       final response = await apiService.evaluateAllActivities(
         userData: userData,
         completedActivities: [widget.result],
+        userId: child.tutorId, // ID del padre/tutor
+        childId: child.id, // ID del niño
+        userName: tutorName, // Nombre del padre
+        childName: child.name, // Nombre del niño
       );
 
       if (response != null && mounted) {
-        // Crear ActivityResult a partir de la respuesta
+        // Crear resultado con datos de ML
         final mlResult = ActivityResult(
           activityId: widget.result.activityId,
           activityName: widget.result.activityName,
           timestamp: DateTime.now(),
           result: response['result'],
-          probability: (response['probability'] as num).toDouble() / 100,
-          confidence: (response['confidence'] as num).toDouble() / 100,
+          probability: (response['probability'] as num)
+              .toDouble(), // Backend ya envía en porcentaje (0-100)
+          confidence: (response['confidence'] as num)
+              .toDouble(), // Backend ya envía en porcentaje (0-100)
           details: {
             'risk_level': response['risk_level'],
             'activities_processed': response['details']['activities_processed'],
             'total_rounds': response['details']['total_rounds'],
             'features_extracted': response['details']['features_extracted'],
+            'rounds': widget.result.rounds
+                .map(
+                  (round) => {
+                    'roundNumber': round.roundNumber,
+                    'clicks': round.clicks,
+                    'hits': round.hits,
+                    'misses': round.misses,
+                    'score': round.score,
+                    'accuracy': round.accuracy,
+                    'missrate': round.missrate,
+                  },
+                )
+                .toList(),
+            'totalClicks': widget.result.totalClicks,
+            'totalHits': widget.result.totalHits,
+            'totalMisses': widget.result.totalMisses,
+            'averageAccuracy': widget.result.averageAccuracy,
           },
           duration: widget.result.totalDuration,
         );
 
         setState(() => _mlResult = mlResult);
-        await context.read<StorageService>().saveActivityResult(mlResult);
+
+        // Guardar resultado CON evaluación ML
+        try {
+          final db = DatabaseService();
+          final saved = await db.saveActivityResult(
+            userId: widget.userId,
+            childId: widget.childId,
+            result: mlResult,
+          );
+
+          if (saved) {
+            print(
+              '✅ Resultado guardado exitosamente con ML - userId: ${widget.userId}, childId: ${widget.childId}',
+            );
+          } else {
+            print('❌ Error: No se pudo guardar el resultado');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('⚠️ Error al guardar el resultado'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          }
+        } catch (saveError) {
+          print('❌ Error al guardar: $saveError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al guardar: $saveError'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
 
         final probability = response['probability'];
         final riskLevel = response['risk_level'];
@@ -109,13 +193,30 @@ class _RoundResultsScreenState extends State<RoundResultsScreen>
         }
 
         await context.read<AudioService>().speak(message);
+      } else {
+        // Backend no disponible - mostrar error
+        print('❌ Backend no disponible - no se puede completar la evaluación');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '❌ Error: El servidor de evaluación no está disponible. '
+                'Por favor, asegúrate de que el backend esté ejecutándose.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
       }
     } catch (e) {
+      print('❌ Error en evaluación ML: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error en evaluación: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
           ),
         );
       }
@@ -574,7 +675,7 @@ class _RoundResultsScreenState extends State<RoundResultsScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${(result.probability * 100).toStringAsFixed(1)}%',
+                    '${result.probability.toStringAsFixed(1)}%',
                     style: TextStyle(
                       fontSize: 56,
                       fontWeight: FontWeight.bold,
@@ -614,12 +715,12 @@ class _RoundResultsScreenState extends State<RoundResultsScreen>
               children: [
                 _buildMLStat(
                   'Probabilidad',
-                  '${(result.probability * 100).toStringAsFixed(1)}%',
+                  '${result.probability.toStringAsFixed(1)}%',
                   Icons.analytics,
                 ),
                 _buildMLStat(
                   'Confianza',
-                  '${(result.confidence * 100).toStringAsFixed(1)}%',
+                  '${result.confidence.toStringAsFixed(1)}%',
                   Icons.verified,
                 ),
               ],

@@ -12,7 +12,14 @@ import '../results/round_results_screen.dart';
 /// Métricas: Clicks, Hits, Misses, Score, Accuracy, Missrate
 
 class VisualDiscriminationActivityScreen extends StatefulWidget {
-  const VisualDiscriminationActivityScreen({super.key});
+  final String userId;
+  final String childId;
+
+  const VisualDiscriminationActivityScreen({
+    super.key,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   State<VisualDiscriminationActivityScreen> createState() =>
@@ -283,7 +290,13 @@ class _VisualDiscriminationActivityScreenState
     );
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => RoundResultsScreen(result: result)),
+      MaterialPageRoute(
+        builder: (_) => RoundResultsScreen(
+          result: result,
+          userId: widget.userId,
+          childId: widget.childId,
+        ),
+      ),
     );
   }
 

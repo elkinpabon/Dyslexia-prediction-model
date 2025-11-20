@@ -8,7 +8,14 @@ import 'activities/text_rounds_activity_screen.dart';
 
 /// Menú de juegos educativos (5 actividades de práctica)
 class GamesMenuScreen extends StatelessWidget {
-  const GamesMenuScreen({super.key});
+  final String userId;
+  final String childId;
+
+  const GamesMenuScreen({
+    super.key,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +26,10 @@ class GamesMenuScreen extends StatelessWidget {
         description: '10 rondas • Identifica diferencias entre b/d/p/q',
         icon: Icons.visibility,
         color: Colors.indigo,
-        screen: const VisualDiscriminationActivityScreen(),
+        screen: VisualDiscriminationActivityScreen(
+          userId: userId,
+          childId: childId,
+        ),
       ),
       _ActivityItem(
         title: 'Sonido-Letra',
@@ -27,7 +37,7 @@ class GamesMenuScreen extends StatelessWidget {
         description: '10 rondas • Escucha y selecciona la letra correcta',
         icon: Icons.hearing,
         color: Colors.blue,
-        screen: const SequenceRoundsActivityScreen(),
+        screen: SequenceRoundsActivityScreen(userId: userId, childId: childId),
       ),
       _ActivityItem(
         title: 'Memoria Secuencial',
@@ -35,7 +45,7 @@ class GamesMenuScreen extends StatelessWidget {
         description: '10 rondas • Memoriza y reproduce el orden',
         icon: Icons.memory,
         color: Colors.pink,
-        screen: const MemoryRoundsActivityScreen(),
+        screen: MemoryRoundsActivityScreen(userId: userId, childId: childId),
       ),
       _ActivityItem(
         title: 'Dictado Auditivo',
@@ -43,7 +53,7 @@ class GamesMenuScreen extends StatelessWidget {
         description: '10 rondas • Transcribe las palabras correctamente',
         icon: Icons.keyboard,
         color: Colors.teal,
-        screen: const TextRoundsActivityScreen(),
+        screen: TextRoundsActivityScreen(userId: userId, childId: childId),
       ),
       _ActivityItem(
         title: 'Errores Ortográficos',
@@ -51,7 +61,7 @@ class GamesMenuScreen extends StatelessWidget {
         description: '10 rondas • Encuentra palabras mal escritas',
         icon: Icons.spellcheck,
         color: Colors.orange,
-        screen: const SpeedRoundsActivityScreen(),
+        screen: SpeedRoundsActivityScreen(userId: userId, childId: childId),
       ),
     ];
 

@@ -12,7 +12,14 @@ import '../results/round_results_screen.dart';
 /// Genera: clicks, hits, misses, score, accuracy, missrate para dataset
 
 class TextRoundsActivityScreen extends StatefulWidget {
-  const TextRoundsActivityScreen({super.key});
+  final String userId;
+  final String childId;
+
+  const TextRoundsActivityScreen({
+    super.key,
+    required this.userId,
+    required this.childId,
+  });
 
   @override
   State<TextRoundsActivityScreen> createState() =>
@@ -260,7 +267,13 @@ class _TextRoundsActivityScreenState extends State<TextRoundsActivityScreen>
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => RoundResultsScreen(result: result)),
+        MaterialPageRoute(
+          builder: (_) => RoundResultsScreen(
+            result: result,
+            userId: widget.userId,
+            childId: widget.childId,
+          ),
+        ),
       );
     }
   }
