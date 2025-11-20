@@ -1,143 +1,64 @@
-# Python
+# ========== PYTHON ==========
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual Environment
+# Virtual Environment (opcional - si quieres compartirlo, comenta estas líneas)
 venv/
 ENV/
 env/
 .venv
-.ENV
-.env
 
-# IDE
+# ========== IDE ==========
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
+.atom/
 
-# Flask
-instance/
-.webassets-cache
-
-# PyCharm
-.idea/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Logs
+# ========== DEVELOPMENT ==========
 *.log
 logs/
+.history
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Environment variables
+# ========== SECRETS & CONFIG ==========
+# Solo ignora archivos de configuración sensibles, NO los examples
 .env
 .env.local
+.env.*.local
 
-# Flutter/Dart
+# ========== FLUTTER/DART BUILD (necesario - son temporales) ==========
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.packages
 .pub-cache/
 .pub/
 build/
+.packages
 
-# Android
-*.iml
+# ========== ANDROID BUILD (necesario - son temporales) ==========
 .gradle/
-local.properties
+.cxx/
 .idea/
 *.hprof
-.cxx/
 
-# iOS
-*.mode1v3
-*.mode2v3
-*.moved-aside
-*.pbxuser
-*.perspectivev3
-**/*sync/
-.sconsign.dblite
-.tags*
-**/.vagrant/
-**/DerivedData/
-Icon?
-**/Pods/
-**/.symlinks/
+# ========== iOS BUILD (necesario - son temporales) ==========
+DerivedData/
+.symlinks/
 profile
-xcuserdata
-**/.generated/
-Flutter/App.framework
-Flutter/Flutter.framework
-Flutter/Flutter.podspec
-Flutter/Generated.xcconfig
-Flutter/ephemeral/
-Flutter/app.flx
-Flutter/app.zip
-Flutter/flutter_assets/
-Flutter/flutter_export_environment.sh
-ServiceDefinitions.json
-Runner/GeneratedPluginRegistrant.*
+xcuserdata/
 
-# Web
-.dart_tool/
-.packages
-pubspec.lock
-build/
-
-# Windows
-flutter/ephemeral/
-Generated.xcconfig
-ephemeral/
-
-# Coverage
+# ========== COVERAGE & REPORTS ==========
 coverage/
+*.profdata
 
-# Miscellaneous
-*.class
-*.lock
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-migrate_working_dir/
-
-# Model files (opcional - descomentar si no quieres versionar los modelos)
-# *.pkl
-# *.h5
-# *.joblib
-# *.model
-
-# Large dataset files (opcional)
-# *.csv
+# ========== GIT ==========
+.git/
+.gitmodules
