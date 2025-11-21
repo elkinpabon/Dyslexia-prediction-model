@@ -1,11 +1,18 @@
 {
-  "version": "2.0_fast_optimized",
-  "accuracy": 0.8948412698412699,
-  "roc_auc": 0.8332510288065843,
-  "f1_score": 0.15873015873015872,
-  "balanced_accuracy": 0.5418518518518519,
-  "cv_roc_auc_mean": 0.9955662241451583,
-  "cv_roc_auc_std": 0.0015775668582324615,
+  "version": "2.2_xgboost_optimized",
+  "model_type": "XGBoost_Calibrated_OptimalBalance",
+  "architecture": "XGBoost with Isotonic Calibration",
+  "base_model": "XGBClassifier",
+  "calibration": "isotonic regression",
+  "decision_threshold": 0.25,
+  "accuracy": 0.8700396825396826,
+  "precision": 0.4195804195804196,
+  "recall": 0.5555555555555556,
+  "f1_score": 0.47808764940239046,
+  "f1_weighted": 0.8778121024602521,
+  "roc_auc": 0.8448045267489712,
+  "balanced_accuracy": 0.7316666666666667,
+  "false_positive_rate": 0.5804195804195804,
   "features": [
     "Gender",
     "Nativelang",
@@ -211,22 +218,20 @@
     "clicks_total",
     "global_accuracy",
     "error_concentration",
-    "initial_response_time",
     "consistency_score"
   ],
-  "n_features": 206,
-  "training_samples": 7240,
-  "test_samples_real": 1008,
-  "feature_importance_top10": {
-    "Nativelang": 0.06776462807682528,
-    "Clicks24": 0.03451633302735608,
-    "Hits24": 0.02781396662695467,
-    "Clicks25": 0.025733951514196288,
-    "Score24": 0.019744836084335284,
-    "Hits25": 0.018121566068586285,
-    "Age": 0.015349949688657319,
-    "Score25": 0.013683665230694088,
-    "Clicks22": 0.012828089271493393,
-    "Hits22": 0.012242351915866685
-  }
+  "n_features": 205,
+  "training_samples": 7058,
+  "test_samples": 1008,
+  "confusion_matrix": [
+    [
+      817,
+      83
+    ],
+    [
+      48,
+      60
+    ]
+  ],
+  "clinical_interpretation": "XGBoost detecta 55% de casos reales con 58% falsas alarmas - Óptimo para screening médico"
 }

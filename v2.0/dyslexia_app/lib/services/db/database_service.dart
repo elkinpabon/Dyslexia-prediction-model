@@ -31,18 +31,43 @@ class DatabaseService {
 
     _logger.i('Database path: $path');
 
-    return openDatabase(
-      path,
-      version: 2,
-      onCreate: _createTables,
-      onUpgrade: _onUpgrade,
-    );
+    try {
+      return await openDatabase(
+        path,
+        version: 3,
+        onCreate: _createTables,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e) {
+      _logger.e('Error opening database: $e');
+      _logger.i('Attempting to delete and recreate database...');
+
+      try {
+        // Borrar la BD corrupta
+        await deleteDatabase(path);
+        _logger.i('✅ Database deleted, recreating...');
+
+        // Recrear
+        return await openDatabase(
+          path,
+          version: 3,
+          onCreate: _createTables,
+          onUpgrade: _onUpgrade,
+        );
+      } catch (e2) {
+        _logger.e('Failed to recreate database: $e2');
+        rethrow;
+      }
+    }
   }
 
   /// Actualizar base de datos
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    _logger.i('Upgrading database from version $oldVersion to $newVersion');
+
     if (oldVersion < 2) {
       // Crear tabla de niños
+      _logger.i('Creating children table...');
       await db.execute('''
         CREATE TABLE IF NOT EXISTS $_childrenTable (
           id TEXT PRIMARY KEY,
@@ -57,10 +82,38 @@ class DatabaseService {
         )
       ''');
 
-      // Actualizar tabla activity_results para soportar childId
-      await db.execute('''
-        ALTER TABLE $_activityResultsTable ADD COLUMN childId TEXT
-      ''');
+      // Agregar columna childId a activity_results
+      _logger.i('Adding childId column to activity_results...');
+      try {
+        await db.execute('''
+          ALTER TABLE $_activityResultsTable ADD COLUMN childId TEXT
+        ''');
+      } catch (e) {
+        _logger.w('childId column may already exist: $e');
+      }
+    }
+
+    if (oldVersion < 3) {
+      _logger.i('Verifying all tables exist in version 3...');
+      // Asegurar que todas las tablas existen
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS $_childrenTable (
+            id TEXT PRIMARY KEY,
+            tutorId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            age INTEGER NOT NULL,
+            dateOfBirth TEXT,
+            notes TEXT,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT,
+            FOREIGN KEY (tutorId) REFERENCES $_usersTable (id)
+          )
+        ''');
+        _logger.i('✅ Children table ready');
+      } catch (e) {
+        _logger.e('Error creating children table: $e');
+      }
     }
   }
 
@@ -298,11 +351,13 @@ class DatabaseService {
     String? notes,
   }) async {
     try {
+      _logger.i('📝 Creando niño: name="$name", age=$age, tutorId=$tutorId');
+
       final db = await database;
       final now = DateTime.now().toIso8601String();
       final id = 'child_${DateTime.now().millisecondsSinceEpoch}';
 
-      await db.insert(_childrenTable, {
+      final childData = {
         'id': id,
         'tutorId': tutorId,
         'name': name,
@@ -311,9 +366,13 @@ class DatabaseService {
         'notes': notes,
         'createdAt': now,
         'updatedAt': now,
-      });
+      };
 
-      _logger.i('Perfil de niño creado: $name');
+      _logger.i('📊 Datos a guardar: $childData');
+
+      await db.insert(_childrenTable, childData);
+
+      _logger.i('✅ Perfil de niño creado exitosamente: $name (ID: $id)');
 
       return ChildProfile(
         id: id,
@@ -326,7 +385,7 @@ class DatabaseService {
         updatedAt: DateTime.parse(now),
       );
     } catch (e) {
-      _logger.e('Error creando perfil de niño: $e');
+      _logger.e('❌ Error creando perfil de niño: $e');
       return null;
     }
   }

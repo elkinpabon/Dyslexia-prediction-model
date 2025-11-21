@@ -35,6 +35,15 @@ def create_app(config_class=None):
     from app.routes import api_bp
     app.register_blueprint(api_bp)
     
+    # Manejador para cerrar transacciones después de cada request
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        """Cierra la sesión de BD después de cada request"""
+        if exception is not None:
+            print(f"❌ Excepción en request: {exception}")
+            db.session.rollback()
+        db.session.remove()
+    
     # Crear tablas si no existen (solo en desarrollo)
     with app.app_context():
         if app.config['DEBUG']:

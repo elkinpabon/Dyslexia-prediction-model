@@ -17,6 +17,7 @@ class Config:
     
     MODEL_PATH = os.path.join(BACKEND_ROOT, "pkl", "modelo_dislexia_optimizado.pkl")
     IMPUTER_PATH = os.path.join(BACKEND_ROOT, "pkl", "imputer_optimizado.pkl")
+    SCALER_PATH = os.path.join(BACKEND_ROOT, "pkl", "scaler_optimizado.pkl")  # NUEVO en v2.1
     INFO_PATH = os.path.join(BACKEND_ROOT, "pkl", "modelo_info.json")
     
     # Database Configuration

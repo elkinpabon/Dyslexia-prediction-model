@@ -50,6 +50,9 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   Color _feedbackColor = Colors.transparent;
   bool _showFeedback = false;
 
+  // Flag para bloquear clicks múltiples en speed reading (Error #4)
+  bool _taskAnswered = false;
+
   @override
   void initState() {
     super.initState();
@@ -118,8 +121,14 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     _currentHits = 0;
     _currentMisses = 0;
     _reactionTimes.clear();
-    _taskStartTime = DateTime.now();
     _showFeedback = false;
+    _taskAnswered = false;
+
+    // FIX #8: Capturar _taskStartTime de forma precisa después de que la UI esté lista
+    // Usar Future.microtask() para sincronizar con ciclo de rendering
+    Future.microtask(() {
+      _taskStartTime = DateTime.now();
+    });
 
     if (_currentTask < 8) {
       _initVisualTask();
@@ -277,7 +286,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar (sin feedback de correcto/incorrecto)
     await _completeTask();
   }
 
@@ -300,8 +308,8 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       letters.add(distractor);
     }
 
-    // Rellenar con letras aleatorias similares
-    final fillerLetters = [target, distractor, 'o', 'a', 'e'];
+    // Rellenar con letras aleatorias similares (ERROR #1: sin target)
+    final fillerLetters = [distractor, 'o', 'a', 'e'];
     while (letters.length < totalCells) {
       letters.add(fillerLetters[_random.nextInt(fillerLetters.length)]);
     }
@@ -457,12 +465,17 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
         'instruction': 'Escucha y selecciona una letra',
       },
     ];
-    _taskState = auditoryTasks[(_currentTask - 8) % 8];
+    // FIX #15: Crear una COPIA del task, no una referencia
+    // para evitar que shuffle() modifique el original
+    _taskState = Map<String, dynamic>.from(
+      auditoryTasks[(_currentTask - 8) % 8],
+    );
     _taskState['played'] = false;
 
-    // Aleatorizar opciones para evitar que siempre sea la primera
+    // ERROR #7: Usar seed determinista en shuffle
     final options = List<String>.from(_taskState['options'] as List);
-    options.shuffle(_random);
+    final taskRandom = Random(_currentTask); // Seed basada en task
+    options.shuffle(taskRandom);
     _taskState['options'] = options;
   }
 
@@ -494,7 +507,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar
     await _completeTask();
   }
 
@@ -708,6 +720,13 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   void _handleMemoryInput(String letter) async {
     if (_isProcessing || _taskState['phase'] != 'reproducing') return;
 
+    final sequence = _taskState['sequence'] as List<String>;
+    final userInput = _taskState['userInput'] as List<String>;
+
+    if (userInput.length >= sequence.length) {
+      return;
+    }
+
     final clickTime = DateTime.now();
     final reactionTime = clickTime
         .difference(_taskStartTime ?? clickTime)
@@ -715,15 +734,12 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     _reactionTimes.add(reactionTime);
 
     _currentClicks++;
-    final userInput = _taskState['userInput'] as List<String>;
     userInput.add(letter);
 
-    final sequence = _taskState['sequence'] as List<String>;
     final currentIndex = userInput.length - 1;
 
     setState(() {});
 
-    // Verificar si es correcto solo si no excedemos el tamaño de la secuencia
     if (currentIndex < sequence.length) {
       final isCorrect = letter == sequence[currentIndex];
 
@@ -734,9 +750,8 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       }
     }
 
-    // Si completó la secuencia (correcta o incorrectamente)
     if (userInput.length >= sequence.length) {
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 100));
       await _completeTask();
     }
   }
@@ -1078,7 +1093,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   }
 
   void _handleDictationTap(String selected) async {
-    if (_isProcessing) return;
+    if (_isProcessing || _taskAnswered) return;
 
     final clickTime = DateTime.now();
     final reactionTime = clickTime
@@ -1095,7 +1110,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar
     await _completeTask();
   }
 
@@ -1232,7 +1246,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   }
 
   void _handleSpeedAnswer(bool userSaysCorrect) async {
-    if (_isProcessing) return;
+    if (_isProcessing || _taskAnswered) return;
 
     final clickTime = DateTime.now();
     final reactionTime = clickTime
@@ -1251,7 +1265,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar
     await _completeTask();
   }
 
@@ -1463,7 +1476,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar
     await _completeTask();
   }
 
@@ -1636,7 +1648,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _currentMisses++;
     }
 
-    // Registrar la selección y avanzar
     await _completeTask();
   }
 
@@ -1747,17 +1758,21 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   // ========== COMPLETAR TAREA ==========
   Future<void> _completeTask() async {
     if (_isProcessing) return;
-    setState(() => _isProcessing = true);
 
-    // Métricas avanzadas para futuras versiones:
-    // final endTime = DateTime.now();
-    // final duration = endTime.difference(_taskStartTime ?? endTime).inMilliseconds;
-    // final avgReactionTime = _reactionTimes.isNotEmpty
-    //     ? _reactionTimes.reduce((a, b) => a + b) / _reactionTimes.length
-    //     : 0.0;
-    // final accuracy = _currentClicks > 0 ? _currentHits / _currentClicks : 0.0;
+    // P2: Validación crítica
+    assert(
+      _currentClicks == _currentHits + _currentMisses,
+      'ERROR P2: Invariant violated!\n'
+      'clicks($_currentClicks) != hits($_currentHits) + misses($_currentMisses)\n',
+    );
 
-    // Crear RoundData usando el factory calculate
+    // P3: Bloquear INMEDIATAMENTE
+    setState(() {
+      _isProcessing = true;
+      _taskAnswered = true;
+    });
+
+    // Crear RoundData
     final roundData = RoundData.calculate(
       roundNumber: _currentTask + 1,
       clicks: _currentClicks,
@@ -1767,9 +1782,17 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
 
     _completedRounds.add(roundData);
 
-    // Avanzar o finalizar (48 tareas total)
+    // Delay mínimo para animación (100ms en lugar de 300ms)
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    // Avanzar o finalizar
     if (_currentTask < 47) {
       setState(() {
+        _currentClicks = 0;
+        _currentHits = 0;
+        _currentMisses = 0;
+        _reactionTimes.clear();
+        _taskAnswered = false;
         _currentTask++;
         _isProcessing = false;
       });

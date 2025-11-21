@@ -76,12 +76,36 @@ class FeatureExtractor:
         }
         
         for round_data in rounds:
-            metrics['clicks'].append(round_data.get('clicks', 0))
-            metrics['hits'].append(round_data.get('hits', 0))
-            metrics['misses'].append(round_data.get('misses', 0))
-            metrics['score'].append(round_data.get('score', 0))
-            metrics['accuracy'].append(round_data.get('accuracy', 0.0))
-            metrics['missrate'].append(round_data.get('missrate', 0.0))
+            clicks = round_data.get('clicks', 0)
+            hits = round_data.get('hits', 0)
+            misses = round_data.get('misses', 0)
+            score = round_data.get('score', 0)
+            accuracy = round_data.get('accuracy', 0.0)
+            missrate = round_data.get('missrate', 0.0)
+            
+            # NORMALIZACIÓN CRÍTICA: Asegurar que Accuracy está en [0, 1]
+            # Si accuracy > 1, asumir que es un Score y convertir a proporción
+            if accuracy > 1 and clicks > 0:
+                accuracy = hits / clicks
+            elif accuracy < 0:
+                accuracy = 0.0
+            elif accuracy > 1:
+                accuracy = 1.0  # Clamp a 1.0 si no se puede calcular
+            
+            # NORMALIZACIÓN: Asegurar que Missrate está en [0, 1]
+            if missrate > 1 and clicks > 0:
+                missrate = misses / clicks
+            elif missrate < 0:
+                missrate = 0.0
+            elif missrate > 1:
+                missrate = 1.0
+            
+            metrics['clicks'].append(clicks)
+            metrics['hits'].append(hits)
+            metrics['misses'].append(misses)
+            metrics['score'].append(score)
+            metrics['accuracy'].append(accuracy)
+            metrics['missrate'].append(missrate)
         
         return metrics
     
@@ -228,7 +252,10 @@ class FeatureExtractor:
             for key in all_rounds_metrics.keys():
                 all_rounds_metrics[key].extend(metrics[key])
         
-        # 3. RELLENAR O TRUNCAR A 32 RONDAS
+        # 3. RELLENAR O TRUNCAR A 32 RONDAS (o más si hay disponibles)
+        # El modelo espera exactamente 32 features de rondas (32 rondas × 6 métricas = 192 features)
+        # PERO: Si tenemos más rondas disponibles (como en screening test con 48 rondas),
+        # truncamos a las primeras 32 rondas para mantener compatibilidad con el modelo entrenado
         target_rounds = 32
         current_rounds = len(all_rounds_metrics['clicks'])
         
@@ -244,7 +271,7 @@ class FeatureExtractor:
                 all_rounds_metrics[key].extend([avg_value] * missing_count)
         
         elif current_rounds > target_rounds:
-            # Truncar a 32 rondas
+            # TRUNCAR a 32 rondas - El modelo fue entrenado con 32 rondas
             for key in all_rounds_metrics.keys():
                 all_rounds_metrics[key] = all_rounds_metrics[key][:target_rounds]
         

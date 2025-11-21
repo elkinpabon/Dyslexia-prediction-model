@@ -176,6 +176,7 @@ class ApiService {
         'childId': childId,
         'userName': userName ?? 'Usuario Tablet',
         'childName': childName ?? 'Niño',
+        'childAge': userData['age'] ?? 8, // Edad del niño
         'user': {
           'gender': userData['gender'] ?? 'Male',
           'age': userData['age'] ?? 8,
@@ -277,6 +278,91 @@ class ApiService {
     } catch (e) {
       _logger.e('Error evaluating $activityName: $e');
       return null;
+    }
+  }
+
+  /// Sincronizar nuevo usuario (tutor) con el backend
+  Future<bool> syncUserToBackend({
+    required String userId,
+    required String userName,
+    required int age,
+  }) async {
+    try {
+      _logger.i('📤 Sincronizando usuario al backend: $userName');
+
+      final userData = {
+        'id': userId,
+        'name': userName,
+        'age': age,
+        'gender': 'Male',
+        'native_lang': true,
+        'other_lang': false,
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.apiBaseUrl}/users'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(userData),
+          )
+          .timeout(AppConstants.apiTimeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _logger.i('✅ Usuario sincronizado correctamente al backend');
+        return true;
+      } else {
+        _logger.w('⚠️ Error al sincronizar usuario: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando usuario al backend: $e');
+      return false;
+    }
+  }
+
+  /// Sincronizar nuevo niño (child) con el backend
+  Future<bool> syncChildToBackend({
+    required String childId,
+    required String tutorId,
+    required String childName,
+    required int childAge,
+  }) async {
+    try {
+      _logger.i('📤 Sincronizando niño al backend: $childName');
+
+      final childData = {
+        'id': childId,
+        'user_id': tutorId,
+        'name': childName,
+        'age': childAge,
+        'gender': 'Male',
+      };
+
+      _logger.i('📊 Datos enviados: $childData');
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.apiBaseUrl}/children'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(childData),
+          )
+          .timeout(AppConstants.apiTimeout);
+
+      _logger.i('📨 Respuesta del servidor: ${response.statusCode}');
+      _logger.i('📄 Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _logger.i('✅ Niño sincronizado correctamente al backend');
+        return true;
+      } else {
+        _logger.w(
+          '⚠️ Error al sincronizar niño: ${response.statusCode} - ${response.body}',
+        );
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando niño al backend: $e');
+      return false;
     }
   }
 }

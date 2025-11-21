@@ -80,19 +80,55 @@ class DatabaseService:
     def create_child(child_data):
         """Crear un nuevo niño"""
         try:
+            user_id = child_data.get('user_id')
+            
+            # Asegurar que el usuario (tutor) existe
+            user = User.query.get(user_id)
+            if not user:
+                print(f"⚠️ Usuario {user_id} no existe, creando automáticamente...")
+                user = User(
+                    id=user_id,
+                    name=child_data.get('tutor_name', f'Tutor {user_id}'),
+                    age=0,
+                    gender='M',
+                    native_lang=True,
+                    other_lang=False
+                )
+                db.session.add(user)
+                db.session.flush()
+            
+            # Preparar datos del niño con valores por defecto
             child = Child(
-                id=child_data['id'],
-                user_id=child_data['user_id'],
-                name=child_data['name'],
-                age=child_data['age'],
-                gender=child_data['gender'],
+                id=child_data.get('id'),
+                user_id=user_id,
+                name=child_data.get('name', 'Sin nombre'),
+                age=child_data.get('age', 0),
+                gender=child_data.get('gender', 'M'),  # Por defecto 'M'
                 birth_date=child_data.get('birth_date')
             )
+            
+            print(f"📝 Creando Child: id={child.id}, name={child.name}, age={child.age}, gender={child.gender}, user_id={child.user_id}")
+            
             db.session.add(child)
             db.session.commit()
+            
+            # Obtener los datos ANTES de desatachar
+            child_id = child.id
+            child_name = child.name
+            
+            # Desatachar el objeto para evitar problemas con transacciones
+            db.session.expunge(child)
+            
+            print(f"✅ Niño guardado exitosamente en BD: {child_name} (ID: {child_id})")
             return child
+            
         except SQLAlchemyError as e:
             db.session.rollback()
+            print(f"❌ Error SQLAlchemy creando niño: {str(e)}")
+            raise e
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error general creando niño: {str(e)}")
             raise e
     
     @staticmethod
@@ -101,9 +137,48 @@ class DatabaseService:
         return Child.query.get(child_id)
     
     @staticmethod
+    def get_all_children():
+        """Obtener todos los niños"""
+        return Child.query.order_by(Child.created_at.desc()).all()
+    
+    @staticmethod
     def get_children_by_user(user_id):
         """Obtener todos los niños de un usuario"""
         return Child.query.filter_by(user_id=user_id).order_by(Child.created_at.desc()).all()
+    
+    @staticmethod
+    def update_child(child_id, child_data):
+        """Actualizar niño"""
+        try:
+            child = Child.query.get(child_id)
+            if not child:
+                return None
+            
+            for key, value in child_data.items():
+                if hasattr(child, key):
+                    setattr(child, key, value)
+            
+            child.updated_at = datetime.utcnow()
+            db.session.commit()
+            return child
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            raise e
+    
+    @staticmethod
+    def delete_child(child_id):
+        """Eliminar niño"""
+        try:
+            child = Child.query.get(child_id)
+            if not child:
+                return False
+            
+            db.session.delete(child)
+            db.session.commit()
+            return True
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            raise e
     
     # ============ GET OR CREATE HELPERS ============
     

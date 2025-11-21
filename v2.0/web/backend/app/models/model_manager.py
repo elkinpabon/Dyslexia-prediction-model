@@ -20,6 +20,7 @@ class ModelManager:
         
         self.model = None
         self.imputer = None
+        self.scaler = None
         self.model_info = {}
         self._initialized = True
         self._load_models()
@@ -29,18 +30,20 @@ class ModelManager:
         try:
             self.model = joblib.load(Config.MODEL_PATH)
             self.imputer = joblib.load(Config.IMPUTER_PATH)
+            # NUEVO en v2.1: Cargar scaler
+            self.scaler = joblib.load(Config.SCALER_PATH)
             
             with open(Config.INFO_PATH, 'r') as f:
                 self.model_info = json.load(f)
             
-            print("✓ Modelos cargados exitosamente")
+            print("✓ Modelos cargados exitosamente (incluyendo scaler v2.1)")
         except Exception as e:
             print(f"✗ Error cargando modelos: {e}")
             raise
     
     def is_ready(self):
         """Verificar si los modelos están listos"""
-        return self.model is not None and self.imputer is not None
+        return self.model is not None and self.imputer is not None and self.scaler is not None
     
     def predict(self, features):
         """Realizar predicción individual"""
@@ -60,23 +63,20 @@ class ModelManager:
                 f"se recibieron {len(features)}"
             )
         
-        # Convertir a array numpy 2D (sin nombres de columnas)
+        # Convertir a array numpy 2D
         import numpy as np
         X = np.array([features])
         
-        print(f"🔍 Array shape: {X.shape}")
+        print(f"🔍 Array shape antes de scaler: {X.shape}")
         
-        # NO USAR IMPUTER - Los datos de la app ya vienen completos
-        # El imputer fue entrenado con 196 features (antes del feature engineering)
-        # pero el modelo usa 206 features (después del feature engineering)
-        # Como la app ya genera las 206 features completas, no necesitamos imputar
+        # NUEVO en v2.1: Aplicar scaler a las features
+        X_scaled = self.scaler.transform(X)
+        print(f"🔍 Array shape después de scaler: {X_scaled.shape}")
         
-        print(f"⚠️  Saltando imputer - datos ya completos de la app")
-        
-        # Predecir directamente (el modelo trabaja con arrays numpy)
-        prediction = self.model.predict(X)[0]
-        probability = self.model.predict_proba(X)[0][1]
-        confidence = float(max(self.model.predict_proba(X)[0]))
+        # Predecir con features escaladas
+        prediction = self.model.predict(X_scaled)[0]
+        probability = self.model.predict_proba(X_scaled)[0][1]
+        confidence = float(max(self.model.predict_proba(X_scaled)[0]))
         
         print(f"✅ Predicción exitosa: {prediction}, probabilidad: {probability:.2%}")
         
@@ -91,17 +91,19 @@ class ModelManager:
         if not self.is_ready():
             raise Exception("Modelo no disponible")
         
-        X = pd.DataFrame(data_list)
+        import numpy as np
         
-        # Imputar
-        X_imputed = pd.DataFrame(
-            self.imputer.transform(X),
-            columns=X.columns
-        )
+        # Convertir a array numpy
+        X = np.array(data_list)
         
-        # Predecir
-        predictions = self.model.predict(X_imputed)
-        probabilities = self.model.predict_proba(X_imputed)[:, 1]
+        # NUEVO en v2.1: Aplicar scaler a las features
+        X_scaled = self.scaler.transform(X)
+        
+        print(f"🔍 Batch - Shape antes: {X.shape}, después: {X_scaled.shape}")
+        
+        # Predecir con features escaladas
+        predictions = self.model.predict(X_scaled)
+        probabilities = self.model.predict_proba(X_scaled)[:, 1]
         
         results = []
         for i, (pred, prob) in enumerate(zip(predictions, probabilities)):
@@ -109,7 +111,7 @@ class ModelManager:
                 "index": i,
                 "prediction": int(pred),
                 "probability": float(prob),
-                "confidence": float(max(self.model.predict_proba(X_imputed)[i]))
+                "confidence": float(max(self.model.predict_proba(X_scaled)[i]))
             })
         
         return results

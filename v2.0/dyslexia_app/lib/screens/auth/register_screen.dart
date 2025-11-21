@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import '../../services/db/database_service.dart';
+import '../../services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -81,6 +82,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
           setState(() {
             _successMessage = '¡Registro exitoso! Redirigiendo a login...';
           });
+
+          // 📤 Sincronizar usuario al backend
+          try {
+            final apiService = ApiService();
+            final syncSuccess = await apiService.syncUserToBackend(
+              userId: newUser.id,
+              userName: newUser.name,
+              age: newUser.age,
+            );
+            if (syncSuccess) {
+              _logger.i('✅ Usuario sincronizado al backend exitosamente');
+            } else {
+              _logger.w(
+                '⚠️ No se pudo sincronizar usuario al backend (modo offline permitido)',
+              );
+            }
+          } catch (e) {
+            _logger.e('Error sincronizando usuario: $e');
+          }
 
           await Future.delayed(const Duration(seconds: 2));
 

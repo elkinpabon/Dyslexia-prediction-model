@@ -50,8 +50,10 @@ class RoundData {
     required int misses,
   }) {
     final score = hits;
-    final accuracy = clicks > 0 ? hits / clicks : 0.0;
-    final missrate = clicks > 0 ? misses / clicks : 0.0;
+    // P1: Corregir fórmula de accuracy para que accuracy + missrate = 1.0
+    final totalResponses = hits + misses;
+    final accuracy = totalResponses > 0 ? hits / totalResponses : 0.0;
+    final missrate = totalResponses > 0 ? misses / totalResponses : 0.0;
 
     return RoundData(
       roundNumber: roundNumber,

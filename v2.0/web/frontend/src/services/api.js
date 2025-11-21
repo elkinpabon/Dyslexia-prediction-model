@@ -31,6 +31,18 @@ export const apiService = {
     return response.data;
   },
 
+  // Obtener todos los niños
+  getChildren: async () => {
+    const response = await api.get('/api/children');
+    return response.data;
+  },
+
+  // Obtener niño por ID
+  getChildById: async (childId) => {
+    const response = await api.get(`/api/children/${childId}`);
+    return response.data;
+  },
+
   // Obtener todos los resultados
   getAllResults: async () => {
     const response = await api.get('/api/results');

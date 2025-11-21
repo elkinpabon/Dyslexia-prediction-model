@@ -448,7 +448,7 @@ def evaluate_rounds():
             # Información para crear niño si no existe
             'child_info': {
                 'name': data.get('childName', 'Niño'),
-                'age': data['user'].get('age', 0),  # Usar edad del user data
+                'age': data.get('childAge', data['user'].get('age', 0)),
                 'gender': data['user'].get('gender', 'Male'),
                 'birth_date': data.get('childBirthDate')
             } if data.get('childId') else None
@@ -566,6 +566,83 @@ def user_by_id(user_id):
             return Response.success(message="Usuario eliminado exitosamente")
         except Exception as e:
             return Response.error(f"Error eliminando usuario: {str(e)}", 500)
+
+@api_bp.route('/children', methods=['GET', 'POST'])
+def children():
+    """Gestión de niños"""
+    if request.method == 'GET':
+        try:
+            children = db_service.get_all_children()
+            return Response.success(
+                data=[child.to_dict() for child in children],
+                message="Niños obtenidos exitosamente"
+            )
+        except Exception as e:
+            return Response.error(f"Error obteniendo niños: {str(e)}", 500)
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            print(f"\n📝 Datos recibidos para crear niño: {data}\n")
+            
+            # Validar que el usuario (tutor) existe
+            user_id = data.get('user_id')
+            if not user_id:
+                return Response.error("user_id es requerido", 400)
+            
+            user = db_service.get_user(user_id)
+            if not user:
+                print(f"⚠️ Usuario {user_id} no existe, creando automáticamente...")
+                return Response.error(f"Usuario (tutor) con ID '{user_id}' no encontrado. Registra primero al tutor.", 404)
+            
+            # Crear el niño
+            child = db_service.create_child(data)
+            
+            # Convertir a dict y retornar
+            child_dict = child.to_dict()
+            print(f"✅ Retornando child_dict: {child_dict}")
+            
+            return Response.success(
+                data=child_dict,
+                message="Niño creado exitosamente",
+                status_code=201
+            )
+        except Exception as e:
+            import traceback
+            error_msg = traceback.format_exc()
+            print(f"❌ Error creando niño:\n{error_msg}")
+            return Response.error(f"Error creando niño: {str(e)}", 500)
+
+@api_bp.route('/children/<child_id>', methods=['GET', 'PUT', 'DELETE'])
+def child_by_id(child_id):
+    """Operaciones sobre un niño específico"""
+    if request.method == 'GET':
+        try:
+            child = db_service.get_child(child_id)
+            if not child:
+                return Response.error("Niño no encontrado", 404)
+            return Response.success(data=child.to_dict(), message="Niño obtenido exitosamente")
+        except Exception as e:
+            return Response.error(f"Error obteniendo niño: {str(e)}", 500)
+    
+    elif request.method == 'PUT':
+        try:
+            data = request.get_json()
+            child = db_service.update_child(child_id, data)
+            if not child:
+                return Response.error("Niño no encontrado", 404)
+            return Response.success(data=child.to_dict(), message="Niño actualizado exitosamente")
+        except Exception as e:
+            return Response.error(f"Error actualizando niño: {str(e)}", 500)
+    
+    elif request.method == 'DELETE':
+        try:
+            success = db_service.delete_child(child_id)
+            if not success:
+                return Response.error("Niño no encontrado", 404)
+            return Response.success(message="Niño eliminado exitosamente")
+        except Exception as e:
+            return Response.error(f"Error eliminando niño: {str(e)}", 500)
 
 @api_bp.route('/results', methods=['GET'])
 def get_all_results():

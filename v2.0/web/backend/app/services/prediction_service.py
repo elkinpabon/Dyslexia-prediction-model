@@ -27,13 +27,16 @@ class PredictionService:
             # Realizar predicción
             prediction_result = self.model_manager.predict(features)
             
+            # Invertir: probability es P(NO dislexia), necesitamos P(dislexia)
+            dyslexia_probability = 1.0 - prediction_result['probability']
+            
             # Clasificar riesgo
-            risk_level = self.classify_risk(prediction_result['probability'])
+            risk_level = self.classify_risk(dyslexia_probability)
             
             return {
                 'success': True,
                 'prediction': prediction_result['prediction'],
-                'probability': prediction_result['probability'],
+                'probability': dyslexia_probability,
                 'confidence': prediction_result['confidence'],
                 'risk_level': risk_level,
                 'activities_processed': list(activities_data.keys()),
@@ -66,14 +69,17 @@ class PredictionService:
             # Realizar predicción
             prediction_result = self.model_manager.predict(features)
             
+            # Invertir: probability es P(NO dislexia), necesitamos P(dislexia)
+            dyslexia_probability = 1.0 - prediction_result['probability']
+            
             # Clasificar riesgo
-            risk_level = self.classify_risk(prediction_result['probability'])
+            risk_level = self.classify_risk(dyslexia_probability)
             
             return {
                 'success': True,
                 'activity': activity_name,
                 'prediction': prediction_result['prediction'],
-                'probability': prediction_result['probability'],
+                'probability': dyslexia_probability,
                 'confidence': prediction_result['confidence'],
                 'risk_level': risk_level,
                 'has_dyslexia_indicators': risk_level in ['Medio', 'Alto']
@@ -84,11 +90,23 @@ class PredictionService:
                 'error': str(e)
             }
     
-    def classify_risk(self, probability):
-        """Clasificar nivel de riesgo según probabilidad"""
-        if probability < 0.3:
+    def classify_risk(self, dyslexia_probability):
+        """Clasificar nivel de riesgo según probabilidad de dislexia
+        
+        Args:
+            dyslexia_probability: P(dislexia) en rango [0, 1]
+            
+        Returns:
+            Nivel de riesgo: 'Bajo', 'Medio', 'Alto'
+            
+        Umbrales calibrados para sensibilidad clínica:
+        - < 0.25: Bajo riesgo (< 25%)
+        - 0.25-0.60: Medio riesgo (25-60%)
+        - >= 0.60: Alto riesgo (>= 60%)
+        """
+        if dyslexia_probability < 0.25:
             return "Bajo"
-        elif probability < 0.7:
+        elif dyslexia_probability < 0.60:
             return "Medio"
         else:
             return "Alto"
@@ -96,14 +114,20 @@ class PredictionService:
     def predict(self, features):
         """Realizar predicción con análisis de riesgo"""
         result = self.model_manager.predict(features)
-        result["risk_level"] = self.classify_risk(result["probability"])
+        # Invertir probability: P(dislexia) = 1 - P(NO dislexia)
+        dyslexia_prob = 1.0 - result["probability"]
+        result["probability"] = dyslexia_prob
+        result["risk_level"] = self.classify_risk(dyslexia_prob)
         return result
     
     def predict_batch(self, data_list):
         """Predicciones en lote con análisis de riesgo"""
         results = self.model_manager.predict_batch(data_list)
         for result in results:
-            result["risk_level"] = self.classify_risk(result["probability"])
+            # Invertir probability: P(dislexia) = 1 - P(NO dislexia)
+            dyslexia_prob = 1.0 - result["probability"]
+            result["probability"] = dyslexia_prob
+            result["risk_level"] = self.classify_risk(dyslexia_prob)
         return results
     
     def get_model_info(self):
