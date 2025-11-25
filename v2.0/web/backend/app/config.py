@@ -15,9 +15,9 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     BACKEND_ROOT = os.path.dirname(BASE_DIR)  # Sube a backend/
     
-    MODEL_PATH = os.path.join(BACKEND_ROOT, "pkl", "modelo_dislexia_optimizado.pkl")
-    IMPUTER_PATH = os.path.join(BACKEND_ROOT, "pkl", "imputer_optimizado.pkl")
-    SCALER_PATH = os.path.join(BACKEND_ROOT, "pkl", "scaler_optimizado.pkl")  # NUEVO en v2.1
+    MODEL_PATH = os.path.join(BACKEND_ROOT, "pkl", "modelo_dislexia.pkl")
+    IMPUTER_PATH = os.path.join(BACKEND_ROOT, "pkl", "imputer.pkl")
+    SCALER_PATH = os.path.join(BACKEND_ROOT, "pkl", "scaler.pkl")
     INFO_PATH = os.path.join(BACKEND_ROOT, "pkl", "modelo_info.json")
     
     # Database Configuration

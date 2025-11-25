@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
-import '../../services/audio/audio_service.dart';
 import '../../services/db/database_service.dart';
 import '../../services/db/storage_service.dart';
 import '../../constants/app_constants.dart';
 import '../../models/child_profile.dart';
 import '../games_menu_screen.dart';
-import '../activities/screening/screening_test_screen.dart';
+import '../activities/screening/screening_test_loading_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? userId;
@@ -428,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen>
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ScreeningTestScreen(
+                  builder: (_) => ScreeningTestLoadingScreen(
                     userId: widget.userId!,
                     childId: _selectedChild!.id,
                   ),

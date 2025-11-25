@@ -85,7 +85,7 @@ class DatabaseService:
             # Asegurar que el usuario (tutor) existe
             user = User.query.get(user_id)
             if not user:
-                print(f"⚠️ Usuario {user_id} no existe, creando automáticamente...")
+                print(f"[WARN] Usuario {user_id} no existe, creando automáticamente...")
                 user = User(
                     id=user_id,
                     name=child_data.get('tutor_name', f'Tutor {user_id}'),

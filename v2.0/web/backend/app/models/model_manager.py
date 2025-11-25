@@ -36,9 +36,9 @@ class ModelManager:
             with open(Config.INFO_PATH, 'r') as f:
                 self.model_info = json.load(f)
             
-            print("✓ Modelos cargados exitosamente (incluyendo scaler v2.1)")
+            print("[OK] Modelos cargados exitosamente (incluyendo scaler v2.1)")
         except Exception as e:
-            print(f"✗ Error cargando modelos: {e}")
+            print(f"[ERROR] Error cargando modelos: {e}")
             raise
     
     def is_ready(self):

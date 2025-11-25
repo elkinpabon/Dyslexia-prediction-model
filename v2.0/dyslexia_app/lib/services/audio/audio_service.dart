@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:audioplayers/audioplayers.dart';
@@ -22,93 +23,135 @@ class AudioService {
   bool get isListening => _isListening;
   bool get speechAvailable => _speechInitialized;
 
-  /// Inicializar TTS (Text-to-Speech) con voz natural mejorada
+  /// Inicializar TTS (Text-to-Speech) con voz natural ESPAÑOL LATINO realista
   Future<void> initializeTts() async {
     if (_ttsInitialized) return;
 
     try {
-      // Configurar idioma español
-      await _tts.setLanguage(AppConstants.ttsLanguage);
+      // ===== CONFIGURACIÓN PARA ESPAÑOL LATINO REALISTA =====
 
-      // ===== CONFIGURACIÓN ÓPTIMA PARA VOZ NATURAL Y AGRADABLE =====
+      // 1. Configurar idioma español (latino preferentemente)
+      await _tts.setLanguage(
+        'es-MX',
+      ); // Español de México (más latino y natural)
 
-      // 1. Velocidad moderada, conversacional y cómoda
-      await _tts.setSpeechRate(0.5); // Ritmo más natural y pausado
+      // 2. Velocidad CONVERSACIONAL natural (0.45 = 55 palabras/min, ideal para niños)
+      await _tts.setSpeechRate(0.45);
 
-      // 2. Volumen óptimo (no al máximo para evitar distorsión)
-      await _tts.setVolume(0.9);
+      // 3. Volumen óptimo (0.85 = audible pero no distorsionado)
+      await _tts.setVolume(0.85);
 
-      // 3. Pitch ligeramente más bajo para voz más cálida y natural
-      await _tts.setPitch(0.95); // Voz más natural, agradable y humana
+      // 4. Pitch NATURAL para voz femenina cálida y acogedora (1.0 = natural)
+      await _tts.setPitch(1.0);
 
-      // 4. iOS específico: Calidad mejorada
+      // 5. iOS específico: Configuración de audio de alta calidad
       await _tts.setIosAudioCategory(
         IosTextToSpeechAudioCategory.playback,
         [
           IosTextToSpeechAudioCategoryOptions.allowBluetooth,
           IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          IosTextToSpeechAudioCategoryOptions.duckOthers,
         ],
         IosTextToSpeechAudioMode.spokenAudio,
       );
 
-      // 5. Android específico: Motor de síntesis mejorado
-      await _tts.setEngine(
-        "com.google.android.tts",
-      ); // Motor de Google (más natural)
+      // 6. Android específico: Motor de síntesis avanzado Google
+      await _tts.setEngine('com.google.android.tts');
 
-      // 6. Seleccionar la MEJOR voz disponible en español
+      // 7. SELECCIONAR MEJOR VOZ DISPONIBLE EN ESPAÑOL LATINO
       final voices = await _tts.getVoices;
+      _logger.i('📢 Voces disponibles: ${voices.length}');
+
       if (voices.isNotEmpty) {
-        // Buscar voces en español
+        // Filtrar SOLO voces en español (preferir latino)
         final spanishVoices = voices.where((voice) {
           final locale = voice['locale'].toString().toLowerCase();
-          return locale.contains('es-es') || // Español de España
-              locale.contains('es-mx') || // Español de México
+
+          // Prioridad: es-mx > es-ar > es-co > es-es > es genérico
+          return locale.contains('es-mx') || // 🥇 México (MÁS LATINO)
+              locale.contains('es-ar') || // 🥈 Argentina
+              locale.contains('es-co') || // 🥉 Colombia
+              locale.contains('es-cl') || // Chile
+              locale.contains('es-pe') || // Perú
+              locale.contains('es-ve') || // Venezuela
+              locale.contains('es-es') || // España (última opción)
               locale.startsWith('es');
         }).toList();
 
         if (spanishVoices.isNotEmpty) {
-          // PRIORIDAD DE VOCES (mejor a peor):
-          // 1. Enhanced/Premium/Neural (voces de IA más naturales)
-          // 2. Female (voces femeninas)
-          // 3. Cualquier voz española disponible
+          _logger.i('✓ Voces en español encontradas: ${spanishVoices.length}');
 
-          final preferredVoice = spanishVoices.firstWhere(
-            (v) {
-              final name = v['name'].toString().toLowerCase();
-              return name.contains('neural') || // Voces IA (Google Neural)
-                  name.contains('enhanced') || // Voces mejoradas
-                  name.contains('premium') || // Voces premium
-                  name.contains('wavenet') || // WaveNet de Google
-                  name.contains('natural'); // Síntesis natural
-            },
-            orElse: () => spanishVoices.firstWhere(
-              (v) => v['name'].toString().toLowerCase().contains('female'),
-              orElse: () => spanishVoices.first,
-            ),
-          );
+          // PRIORIDAD INTELIGENTE DE SELECCIÓN:
+          // 1️⃣ Google Neural Voices (voces IA más naturales)
+          // 2️⃣ Female voices (más acogedoras para niños)
+          // 3️⃣ Cualquier voz disponible
+
+          final preferredVoice = _selectBestSpanishVoice(spanishVoices);
 
           await _tts.setVoice({
             'name': preferredVoice['name'],
             'locale': preferredVoice['locale'],
           });
 
-          _logger.i('✓ Voz natural seleccionada: ${preferredVoice['name']}');
-          _logger.i('  Locale: ${preferredVoice['locale']}');
+          _logger.i('✨ VOZ SELECCIONADA: ${preferredVoice['name']}');
+          _logger.i('   Idioma: ${preferredVoice['locale']}');
+          _logger.i('   Región: ${_getRegionName(preferredVoice["locale"])}');
         } else {
-          _logger.w(
-            '⚠ No se encontraron voces en español, usando voz por defecto',
-          );
+          _logger.w('⚠️ No se encontraron voces en español, usando defecto');
+          // Fallback a español genérico
+          await _tts.setLanguage('es');
         }
       }
 
       _ttsInitialized = true;
-      _logger.i('TTS initialized with enhanced natural voice');
+      _logger.i('🎙️ TTS INICIALIZADO - Voz natural español latino');
     } catch (e) {
       _logger.e('Error initializing TTS: $e');
       _ttsInitialized = true; // Continuar con configuración por defecto
     }
+  }
+
+  /// Selecciona la mejor voz disponible en español
+  /// Prioriza: Neural > Premium > Enhanced > Female > Default
+  Map<String, dynamic> _selectBestSpanishVoice(List<dynamic> voices) {
+    // Buscar voces con máxima prioridad
+    for (final voice in voices) {
+      final name = voice['name'].toString().toLowerCase();
+
+      // 🥇 Máxima prioridad: Voces Neural/Premium (IA más natural)
+      if (name.contains('neural') ||
+          name.contains('premium') ||
+          name.contains('wavenet')) {
+        _logger.i('   📍 Tipo: Neural/Premium (IA avanzada)');
+        return voice;
+      }
+    }
+
+    // 🥈 Segunda prioridad: Voces femeninas (más acogedoras)
+    for (final voice in voices) {
+      final name = voice['name'].toString().toLowerCase();
+      if (name.contains('female') || name.contains('mujer')) {
+        _logger.i('   📍 Tipo: Voz femenina');
+        return voice;
+      }
+    }
+
+    // 🥉 Tercera prioridad: Cualquier voz disponible
+    _logger.i('   📍 Tipo: Voz genérica');
+    return voices.first;
+  }
+
+  /// Obtiene el nombre descriptivo de la región
+  String _getRegionName(String locale) {
+    final l = locale.toLowerCase();
+    if (l.contains('es-mx')) return '🇲🇽 México (Latino)';
+    if (l.contains('es-ar')) return '🇦🇷 Argentina (Latino)';
+    if (l.contains('es-co')) return '🇨🇴 Colombia (Latino)';
+    if (l.contains('es-cl')) return '🇨🇱 Chile (Latino)';
+    if (l.contains('es-pe')) return '🇵🇪 Perú (Latino)';
+    if (l.contains('es-ve')) return '🇻🇪 Venezuela (Latino)';
+    if (l.contains('es-es')) return '🇪🇸 España';
+    return '🌐 Español genérico';
   }
 
   /// Inicializar Speech Recognition
@@ -140,48 +183,34 @@ class AudioService {
     }
   }
 
-  /// Hablar texto (TTS) con pausas naturales
+  /// Hablar texto con flutter_tts LOCAL (sin API)
+  /// ✅ Sin latencia de servidor
+  /// ✅ Voz natural y realista
+  /// ✅ Optimizado para niños
   Future<void> speak(String text, {double? rate, double? pitch}) async {
-    if (!_ttsInitialized) await initializeTts();
+    if (text.isEmpty) {
+      _logger.w('Cannot speak: empty text');
+      return;
+    }
 
     try {
-      await _tts.stop(); // Detener cualquier reproducción previa
+      // Aplicar configuración personalizada si se proporciona
+      if (rate != null) {
+        await _tts.setSpeechRate(rate);
+      }
+      if (pitch != null) {
+        await _tts.setPitch(pitch);
+      }
 
-      // Forzar idioma español antes de hablar
-      await _tts.setLanguage('es-ES');
+      // Hablar con TTS LOCAL (sin API)
+      await _tts.speak(text);
 
-      if (rate != null) await _tts.setSpeechRate(rate);
-      if (pitch != null) await _tts.setPitch(pitch);
-
-      // Mejorar pausas naturales agregando marcadores SSML
-      final textWithPauses = _enhanceTextWithPauses(text);
-
-      await _tts.speak(textWithPauses);
-      _logger.i('Speaking: $textWithPauses');
+      _logger.i(
+        '🎙️ Speaking (local TTS): ${text.substring(0, min(text.length, 50))}',
+      );
     } catch (e) {
       _logger.e('Error speaking: $e');
     }
-  }
-
-  /// Mejora el texto con pausas naturales basadas en puntuación
-  String _enhanceTextWithPauses(String text) {
-    // Agregar pausas extra después de puntos para respiración natural
-    String enhanced = text.replaceAll(
-      '. ',
-      '.  ',
-    ); // Doble espacio = pausa más larga
-
-    // Pausas ligeras después de comas
-    enhanced = enhanced.replaceAll(', ', ',  ');
-
-    // Pausas después de signos de interrogación/exclamación
-    enhanced = enhanced.replaceAll('? ', '?  ');
-    enhanced = enhanced.replaceAll('! ', '!  ');
-
-    // Pausas después de dos puntos
-    enhanced = enhanced.replaceAll(': ', ':  ');
-
-    return enhanced;
   }
 
   /// Hablar con pausa al final (útil para instrucciones secuenciales)
@@ -194,25 +223,7 @@ class AudioService {
     await speak(text, rate: rate, pitch: pitch);
 
     // Esperar a que termine de hablar + pausa adicional
-    await _waitForSpeechCompletion();
     await Future.delayed(pause);
-  }
-
-  /// Esperar a que el TTS termine de hablar
-  Future<void> _waitForSpeechCompletion() async {
-    // Configurar handler para detectar cuando termina
-    bool isCompleted = false;
-
-    _tts.setCompletionHandler(() {
-      isCompleted = true;
-    });
-
-    // Esperar hasta que complete o timeout
-    int attempts = 0;
-    while (!isCompleted && attempts < 100) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      attempts++;
-    }
   }
 
   /// Detener TTS

@@ -6,6 +6,8 @@ import '../../../models/round_data.dart';
 import '../../../services/audio/audio_service.dart';
 import '../../../widgets/loading_overlay.dart';
 import '../../results/round_results_screen.dart';
+import 'screening_flow_controller.dart';
+import 'screening_modals.dart';
 
 class ScreeningTestScreen extends StatefulWidget {
   final String userId;
@@ -28,6 +30,11 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   DateTime? _sessionStartTime;
   DateTime? _taskStartTime;
   bool _isProcessing = false;
+
+  // Control de modales
+  bool _modalActive = true; // El modal inicia ACTIVO
+  bool _taskInitialized =
+      false; // La tarea se inicializa solo después del modal
 
   // Métricas avanzadas de la tarea actual
   int _currentClicks = 0;
@@ -53,6 +60,15 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   // Flag para bloquear clicks múltiples en speed reading (Error #4)
   bool _taskAnswered = false;
 
+  // Contador de fallos consecutivos para reintentos
+  // Logica: Permite hasta 3 intentos por tarea
+  // Cada intento (acierto o fallo) se cuenta en la métrica final
+  // _consecutiveMisses = 0: acierto, continuar
+  // _consecutiveMisses = 1: primer fallo, permitir reintento (fallo se cuenta)
+  // _consecutiveMisses = 2: segundo fallo, permitir reintento (fallo se cuenta)
+  // _consecutiveMisses = 3: tercer fallo, ir a siguiente tarea (fallo se cuenta)
+  int _consecutiveMisses = 0;
+
   @override
   void initState() {
     super.initState();
@@ -77,12 +93,14 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
           ),
         );
 
-    _initializeTask();
-    _animationController.forward();
+    // NO inicializar la tarea aquí - se inicializa DESPUÉS del modal
+    // _initializeTaskState();
+    // _animationController.forward();
 
-    // Mostrar modal de bienvenida después de construir el widget
+    // Mostrar solo el modal de la primera actividad
+    // La pantalla de bienvenida ya se mostró antes de llegar aquí
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showWelcomeDialog();
+      _showActivityModalForCurrentTask();
     });
   }
 
@@ -92,34 +110,11 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     super.dispose();
   }
 
-  Future<void> _showWelcomeDialog() async {
-    if (!mounted) return;
-
-    final audioService = context.read<AudioService>();
-
-    // Reproducir mensaje de bienvenida con información sobre el test
-    audioService.speak(
-      'Bienvenido al test de cribado para dislexia. '
-      'Este test evalúa patrones de respuesta en diferentes áreas como discriminación visual, '
-      'memoria secuencial, y procesamiento auditivo. '
-      'Realizarás 48 tareas cortas con dificultad progresiva. '
-      'No hay respuestas correctas o incorrectas, solo responde naturalmente. '
-      'Lee las instrucciones en pantalla.',
-    );
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return _WelcomeDialogWithTimer(audioService: audioService);
-      },
-    );
-  }
-
-  void _initializeTask() {
+  void _initializeTaskState() {
     _currentClicks = 0;
     _currentHits = 0;
     _currentMisses = 0;
+    _consecutiveMisses = 0; // Resetear contador de fallos
     _reactionTimes.clear();
     _showFeedback = false;
     _taskAnswered = false;
@@ -132,70 +127,121 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
 
     if (_currentTask < 8) {
       _initVisualTask();
-      if (_currentTask == 0) {
-        _speakTaskInstruction(
-          'Comenzamos con tareas de discriminación visual. '
-          'Debes encontrar y tocar la letra que te pido entre varias opciones similares.',
-        );
-      }
     } else if (_currentTask < 16) {
       _initAuditoryTask();
-      if (_currentTask == 8) {
-        _speakTaskInstruction(
-          'Ahora vamos con tareas auditivas. '
-          'Escucha la letra que pronuncio y selecciona la correcta.',
-        );
-      }
     } else if (_currentTask < 24) {
       _initMemoryTask();
-      if (_currentTask == 16) {
-        _speakTaskInstruction(
-          'Tareas de memoria secuencial. '
-          'Memoriza la secuencia de letras que te muestro y luego repítela.',
-        );
-      }
     } else if (_currentTask < 32) {
       _initDictationTask();
-      if (_currentTask == 24) {
-        _speakTaskInstruction(
-          'Ejercicios de dictado. '
-          'Escucha la palabra y escríbela correctamente.',
-        );
-      }
     } else if (_currentTask < 36) {
       _initSpeedTask();
-      if (_currentTask == 32) {
-        _speakTaskInstruction(
-          'Tareas de velocidad y gramática. '
-          'Lee rápidamente e identifica si hay errores.',
-        );
-      }
     } else if (_currentTask < 42) {
       _initIdentifyWrongLetterTask();
-      if (_currentTask == 36) {
-        _speakTaskInstruction(
-          'Encuentra la letra incorrecta. '
-          'Una letra no encaja, identifícala.',
-        );
-      }
     } else {
       _initCompleteWordTask();
-      if (_currentTask == 42) {
-        _speakTaskInstruction(
-          'Completa la palabra. '
-          'Falta una letra, selecciona la correcta.',
-        );
-      }
     }
   }
 
-  void _speakTaskInstruction(String instruction) {
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        final audioService = context.read<AudioService>();
-        audioService.speak(instruction);
+  void _showActivityModalForCurrentTask() {
+    String activityType = '';
+    if (_currentTask == 0) {
+      activityType = 'visual_discrimination';
+    } else if (_currentTask == 8) {
+      activityType = 'auditory';
+    } else if (_currentTask == 16) {
+      activityType = 'memory_sequential';
+    } else if (_currentTask == 24) {
+      activityType = 'dictation';
+    } else if (_currentTask == 32) {
+      activityType = 'speed_grammar';
+    } else if (_currentTask == 36) {
+      activityType = 'identify_wrong_letter';
+    } else if (_currentTask == 42) {
+      activityType = 'complete_word';
+    } else {
+      // Para actividades intermedias, determinar tipo según rango
+      if (_currentTask < 8) {
+        activityType = 'visual_discrimination';
+      } else if (_currentTask < 16) {
+        activityType = 'auditory';
+      } else if (_currentTask < 24) {
+        activityType = 'memory_sequential';
+      } else if (_currentTask < 32) {
+        activityType = 'dictation';
+      } else if (_currentTask < 36) {
+        activityType = 'speed_grammar';
+      } else if (_currentTask < 42) {
+        activityType = 'identify_wrong_letter';
+      } else {
+        activityType = 'complete_word';
       }
-    });
+    }
+
+    // Mostrar modal con timer (5 segundos)
+    _showModalWithTimerAndCountdown(
+      activityNumber: _currentTask,
+      activityType: activityType,
+    );
+  }
+
+  Future<void> _showModalWithTimerAndCountdown({
+    required int activityNumber,
+    required String activityType,
+  }) async {
+    final flowController = ScreeningFlowController(context);
+
+    // Mostrar pantalla en blanco (transición)
+    await flowController.showBlankScreen();
+
+    if (!mounted) return;
+
+    // Determinar si es la PRIMERA tarea del tipo de actividad
+    bool isFirstOfType = false;
+    if (activityNumber == 0 ||
+        activityNumber == 8 ||
+        activityNumber == 16 ||
+        activityNumber == 24 ||
+        activityNumber == 32 ||
+        activityNumber == 36 ||
+        activityNumber == 42) {
+      isFirstOfType = true;
+    }
+
+    // Mostrar PRIMERO el modal de instrucciones SOLO SI ES LA PRIMERA DEL TIPO
+    if (isFirstOfType) {
+      await ScreeningModals.showActivityModal(
+        context,
+        AudioService(),
+        activityNumber: activityNumber,
+        activityType: activityType,
+      );
+
+      if (!mounted) return;
+    }
+
+    // Mostrar LUEGO el modal con timer de 5 segundos
+    final shouldContinue = await flowController.showActivityModalWithTimer(
+      activityNumber: activityNumber,
+      activityType: activityType,
+    );
+
+    if (!shouldContinue) {
+      debugPrint('⚠️ Usuario no presionó continuar');
+    }
+
+    // AHORA sí inicializar la tarea - DESPUÉS de cerrar el modal
+    if (mounted) {
+      setState(() {
+        _modalActive = false;
+        _taskInitialized = true;
+      });
+
+      // Inicializar la tarea
+      _initializeTaskState();
+
+      // Iniciar animaciones
+      _animationController.forward();
+    }
   }
 
   void _initVisualTask() {
@@ -621,8 +667,8 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
 
   // ========== TAREAS DE MEMORIA (16-23) - DIFICULTAD PROGRESIVA ==========
   void _initMemoryTask() {
-    // Dificultad progresiva: 2, 2, 3, 3, 4, 4, 5, 5 elementos
-    final sequenceLengths = [2, 2, 3, 3, 4, 4, 5, 5];
+    // Dificultad progresiva: 2, 2, 3, 3, 3, 4, 4, 5 elementos (10% más sencilla)
+    final sequenceLengths = [2, 2, 3, 3, 3, 4, 4, 5];
     final taskIndex = _currentTask - 16;
     final length = sequenceLengths[taskIndex % 8];
 
@@ -665,7 +711,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       'phase': 'showing', // 'showing', 'hidden', 'reproducing'
       'userInput': <String>[],
       'showingIndex': 0,
-      'instruction': 'Memoriza la secuencia de $length letras',
+      'instruction': '', // Sin instrucción de voz
       'difficulty': taskIndex + 1,
     };
 
@@ -681,8 +727,6 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     final sequence = _taskState['sequence'] as List<String>;
     final audioService = context.read<AudioService>();
 
-    await audioService.speak(_taskState['instruction']);
-
     // Tiempos reducidos para secuencia más ágil
     for (int i = 0; i < sequence.length; i++) {
       await Future.delayed(
@@ -692,6 +736,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       setState(() {
         _taskState['showingIndex'] = i;
       });
+      // Leer cada letra
       await audioService.speak(sequence[i]);
       await Future.delayed(
         const Duration(milliseconds: 900),
@@ -705,10 +750,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       _taskState['phase'] = 'hidden';
     });
 
-    await audioService.speak(
-      'Ahora, reproduce la secuencia en el mismo orden.',
-    );
-
+    // Pasar directamente a reproducir sin instrucciones
     await Future.delayed(const Duration(milliseconds: 600)); // Reducido de 800
     if (!mounted) return;
 
@@ -765,37 +807,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Instrucción
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.orange.shade200, width: 2),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.psychology, color: Colors.orange.shade700, size: 28),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  phase == 'showing'
-                      ? 'Observa y memoriza'
-                      : phase == 'hidden'
-                      ? 'Recuerda la secuencia...'
-                      : 'Reproduce la secuencia',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.orange.shade900,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Instrucción removida - solo mostrar las letras
         const SizedBox(height: 32),
         // Área de secuencia
         if (phase == 'showing') ...[
@@ -1766,7 +1778,69 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
       'clicks($_currentClicks) != hits($_currentHits) + misses($_currentMisses)\n',
     );
 
+    // Verificar si fue acierto o fallo
+    final wasCorrect = _currentMisses == 0; // Si no hay fallos, fue correcto
+
+    if (wasCorrect) {
+      // Si fue correcto, resetear contador de fallos y proceder a siguiente ronda
+      _consecutiveMisses = 0;
+      _proceedToNextTask();
+    } else {
+      // Si fue incorrecto, incrementar contador de fallos
+      _consecutiveMisses++;
+
+      // LOGICA MEJORADA: Permite hasta 3 intentos, PERO cada fallo se cuenta
+      // El fallo SIEMPRE se agrega a _currentMisses (ya hecho arriba)
+      // Si es el tercer fallo, avanzar sin más reintentos
+      if (_consecutiveMisses >= 3) {
+        // Después de 3 fallos, ir a la siguiente ronda (sin reintentos)
+        _consecutiveMisses = 0;
+        _proceedToNextTask();
+      } else {
+        // Si es el 1er o 2do fallo, permitir reintento (manteniendo los fallos contados)
+        setState(() {
+          _isProcessing = false;
+          _taskAnswered = false;
+          // NO resetear _currentClicks, _currentHits, _currentMisses
+          // porque queremos que se acumulen los intentos fallidos
+          _reactionTimes.clear();
+        });
+
+        // Para memoria, reiniciar completamente la secuencia
+        if (_currentTask >= 16 && _currentTask < 24) {
+          // Resetear el estado de la tarea de memoria
+          setState(() {
+            _taskState['userInput'] = <String>[];
+            _taskState['showingIndex'] = 0;
+            _taskState['phase'] = 'showing';
+          });
+          // Reiniciar desde el principio
+          _animationController.reset();
+          await _animationController.forward();
+          _startSequenceDisplay();
+        } else {
+          _animationController.reset();
+          _animationController.forward();
+        }
+      }
+    }
+  }
+
+  Future<void> _proceedToNextTask() async {
     // P3: Bloquear INMEDIATAMENTE
+    final previousTask = _currentTask; // Guardar task anterior
+
+    // Determinar tipo de actividad ANTES de cambiar
+    String getPreviousActivityType() {
+      if (previousTask < 8) return 'visual_discrimination';
+      if (previousTask < 16) return 'auditory';
+      if (previousTask < 24) return 'memory_sequential';
+      if (previousTask < 32) return 'dictation';
+      if (previousTask < 36) return 'speed_grammar';
+      if (previousTask < 42) return 'identify_wrong_letter';
+      return 'complete_word';
+    }
+
     setState(() {
       _isProcessing = true;
       _taskAnswered = true;
@@ -1795,10 +1869,35 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
         _taskAnswered = false;
         _currentTask++;
         _isProcessing = false;
+        _taskInitialized = false; // NO está inicializada aún
       });
       _animationController.reset();
-      _initializeTask();
-      _animationController.forward();
+
+      // Determinar tipo de actividad DESPUÉS de cambiar
+      String getNextActivityType() {
+        if (_currentTask < 8) return 'visual_discrimination';
+        if (_currentTask < 16) return 'auditory';
+        if (_currentTask < 24) return 'memory_sequential';
+        if (_currentTask < 32) return 'dictation';
+        if (_currentTask < 36) return 'speed_grammar';
+        if (_currentTask < 42) return 'identify_wrong_letter';
+        return 'complete_word';
+      }
+
+      final previousType = getPreviousActivityType();
+      final nextType = getNextActivityType();
+
+      // SOLO mostrar modal si cambió el TIPO de actividad (no dentro del mismo tipo)
+      if (previousType != nextType) {
+        setState(() {
+          _modalActive = true; // Activar modal para próxima tarea
+        });
+        _showActivityModalForCurrentTask();
+      } else {
+        // Si es del mismo tipo, reiniciar inmediatamente sin modal
+        _initializeTaskState();
+        _animationController.forward();
+      }
     } else {
       await _finishTest();
     }
@@ -1815,12 +1914,7 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
   }
 
   Future<void> _finishTest() async {
-    final audioService = context.read<AudioService>();
-    await audioService.speak(
-      '¡Felicidades! Has completado las 48 tareas del test de cribado con dificultad progresiva. '
-      'Ahora analizaremos tus patrones de respuesta.',
-    );
-
+    // No hablar nada, solo mostrar pantalla de resultados silenciosamente
     if (!mounted) return;
 
     // Crear ActivityRoundResult para pasar a RoundResultsScreen
@@ -1945,6 +2039,34 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
     );
   }
 
+  // ========== DIÁLOGO DE CONFIRMACIÓN AL SALIR ==========
+  void _showExitConfirmation() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Estás seguro?'),
+        content: const Text(
+          'Si sales ahora, perderás todo tu progreso en el test de cribado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ========== BUILD PRINCIPAL ==========
   @override
   Widget build(BuildContext context) {
@@ -1954,30 +2076,39 @@ class _ScreeningTestScreenState extends State<ScreeningTestScreen>
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 2,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => _showExitConfirmation(),
+        ),
       ),
       body: LoadingOverlay(
         isLoading: _isProcessing,
         child: Stack(
           children: [
-            Column(
-              children: [
-                _buildProgressIndicator(),
-                Expanded(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: _buildCurrentTask(),
+            // Si el modal está activo, mostrar solo fondo blanco
+            if (_modalActive)
+              Container(color: Colors.white)
+            else
+              // Si el modal no está activo, mostrar la actividad
+              Column(
+                children: [
+                  _buildProgressIndicator(),
+                  Expanded(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SlideTransition(
+                        position: _slideAnimation,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: _buildCurrentTask(),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             // Feedback overlay
-            if (_showFeedback)
+            if (_showFeedback && !_modalActive)
               Positioned.fill(
                 child: Container(
                   color: Colors.black54,

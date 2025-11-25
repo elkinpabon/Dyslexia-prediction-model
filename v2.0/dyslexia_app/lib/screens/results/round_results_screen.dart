@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/round_data.dart';
 import '../../services/api_service.dart';
-import '../../services/audio/audio_service.dart';
 import '../../services/db/database_service.dart';
 import '../../constants/app_constants.dart';
 import '../../models/activity_result.dart';
@@ -172,27 +171,8 @@ class _RoundResultsScreenState extends State<RoundResultsScreen>
             );
           }
         }
-
-        final probability = response['probability'];
-        final riskLevel = response['risk_level'];
-
-        // Mensaje más expresivo y claro según el resultado
-        String message;
-        if (mlResult.result == 'SÍ') {
-          message =
-              '¡Atención! El análisis indica que SÍ existe riesgo de dislexia. '
-              'La probabilidad detectada es del $probability por ciento, con nivel de riesgo $riskLevel. '
-              'Te recomendamos realizar una evaluación profesional más completa con un especialista. '
-              'Recuerda que este es solo un análisis preliminar.';
-        } else {
-          message =
-              '¡Buenas noticias! El análisis indica que NO se detecta riesgo de dislexia. '
-              'La probabilidad de dislexia es muy baja, del $probability por ciento. '
-              'No se encontraron indicadores significativos en tus patrones de respuesta. '
-              'Continúa practicando con las actividades educativas si lo deseas.';
-        }
-
-        await context.read<AudioService>().speak(message);
+        // No hablar ningún mensaje al completar, solo mostrar visualmente en pantalla
+        // El usuario puede leer los resultados en la pantalla de forma tranquila
       } else {
         // Backend no disponible - mostrar error
         print('❌ Backend no disponible - no se puede completar la evaluación');

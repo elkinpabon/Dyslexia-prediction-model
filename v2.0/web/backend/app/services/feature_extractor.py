@@ -1,8 +1,8 @@
 """
 Extractor de características basado en el dataset Dyt-desktop.csv
-Genera las 206 features exactas que el modelo ML espera
+Genera las 205 features exactas que el modelo ML espera
 Formato: Gender, Nativelang, Otherlang, Age, Clicks1-32, Hits1-32, Misses1-32, 
-         Score1-32, Accuracy1-32, Missrate1-32 + 10 features derivadas
+         Score1-32, Accuracy1-32, Missrate1-32 + 9 features derivadas
 """
 import numpy as np
 from typing import Dict, List, Tuple
@@ -11,7 +11,16 @@ from datetime import datetime
 
 
 class FeatureExtractor:
-    """Extrae las 206 características exactas del dataset Dyt-desktop.csv"""
+    """Extrae las 205 características exactas del dataset Dyt-desktop.csv
+    
+    Estructura:
+    - 4 demográficas: Gender, Nativelang, Otherlang, Age
+    - 192 métricas: 32 rondas × 6 métricas (Clicks, Hits, Misses, Score, Accuracy, Missrate)
+    - 9 derivadas: accuracy_trend, accuracy_mean_first_half, accuracy_mean_second_half,
+                   accuracy_improvement, clicks_variability, clicks_total, global_accuracy,
+                   error_concentration, consistency_score
+    Total: 4 + 192 + 9 = 205 features
+    """
     
     def __init__(self):
         self.feature_names = self._initialize_feature_names()
@@ -39,7 +48,7 @@ class FeatureExtractor:
                 f'Missrate{i}'
             ])
         
-        # 3. Features derivadas (10 features)
+        # 3. Features derivadas (9 features)
         features.extend([
             'accuracy_trend',           # Tendencia de accuracy a lo largo de las rondas
             'accuracy_mean_first_half', # Promedio de accuracy en primeras 16 rondas
@@ -49,7 +58,6 @@ class FeatureExtractor:
             'clicks_total',            # Total de clicks en todas las rondas
             'global_accuracy',         # Accuracy global de todas las rondas
             'error_concentration',     # Concentración de errores en ciertas rondas
-            'initial_response_time',   # Tiempo de respuesta inicial normalizado
             'consistency_score'        # Consistencia en el desempeño
         ])
         
@@ -160,12 +168,7 @@ class FeatureExtractor:
         else:
             error_concentration = 0.0
         
-        # 9. Tiempo de respuesta inicial (normalizado por clicks)
-        # Usamos clicks de primeras 3 rondas como proxy
-        initial_clicks = sum(clicks[:3]) if len(clicks) >= 3 else sum(clicks)
-        initial_response_time = initial_clicks / 10.0  # Normalizar
-        
-        # 10. Score de consistencia (inverso del coeficiente de variación)
+        # 9. Score de consistencia (inverso del coeficiente de variación)
         if len(accuracies) > 1 and np.mean(accuracies) > 0:
             cv = np.std(accuracies) / np.mean(accuracies)
             consistency_score = 1.0 / (1.0 + cv)  # Entre 0 y 1
@@ -181,13 +184,12 @@ class FeatureExtractor:
             'clicks_total': clicks_total,
             'global_accuracy': global_accuracy,
             'error_concentration': error_concentration,
-            'initial_response_time': initial_response_time,
             'consistency_score': consistency_score
         }
     
     def combine_all_features(self, activities_data: Dict) -> List[float]:
         """
-        Combina características de todas las actividades en el formato del modelo (206 features).
+        Combina características de todas las actividades en el formato del modelo (205 features).
         
         Mapeo de actividades a rondas del modelo:
         - Actividad 1 (Visual Discrimination): 10 rondas → Rondas 1-10
@@ -252,14 +254,48 @@ class FeatureExtractor:
             for key in all_rounds_metrics.keys():
                 all_rounds_metrics[key].extend(metrics[key])
         
-        # 3. RELLENAR O TRUNCAR A 32 RONDAS (o más si hay disponibles)
+        # 3. PROMEDIAR RONDAS PARA AJUSTAR A 32 (si hay más de 32)
         # El modelo espera exactamente 32 features de rondas (32 rondas × 6 métricas = 192 features)
-        # PERO: Si tenemos más rondas disponibles (como en screening test con 48 rondas),
-        # truncamos a las primeras 32 rondas para mantener compatibilidad con el modelo entrenado
+        # Si hay 48 rondas (screening test), promediamos en grupos:
+        # - Rondas 1-3 → Ronda 1 promediada
+        # - Rondas 4-6 → Ronda 2 promediada
+        # - ... hasta Rondas 46-48 → Ronda 16 promediada
+        # Luego duplicamos para obtener 32 rondas equivalentes
         target_rounds = 32
         current_rounds = len(all_rounds_metrics['clicks'])
         
-        if current_rounds < target_rounds:
+        if current_rounds > target_rounds:
+            # Promediar rondas: agrupar cada 3 rondas (48 → 16) y duplicar (16 → 32)
+            group_size = max(1, current_rounds // 16)  # Tamaño de grupo para obtener ~16 grupos
+            
+            # Agrupar y promediar
+            grouped_metrics = {key: [] for key in all_rounds_metrics.keys()}
+            
+            for group_idx in range(0, current_rounds, group_size):
+                group_end = min(group_idx + group_size, current_rounds)
+                
+                for key in all_rounds_metrics.keys():
+                    group_values = all_rounds_metrics[key][group_idx:group_end]
+                    grouped_metrics[key].append(np.mean(group_values) if group_values else 0.0)
+            
+            # Duplicar para obtener 32 rondas (16 grupos × 2)
+            expanded_metrics = {key: [] for key in all_rounds_metrics.keys()}
+            for key in all_rounds_metrics.keys():
+                for value in grouped_metrics[key]:
+                    expanded_metrics[key].extend([value, value])
+            
+            # Ajustar exactamente a 32 rondas si es necesario
+            for key in all_rounds_metrics.keys():
+                expanded_metrics[key] = expanded_metrics[key][:32]
+                
+                # Si hay menos de 32, rellenar con el último valor
+                if len(expanded_metrics[key]) < 32:
+                    last_value = expanded_metrics[key][-1] if expanded_metrics[key] else 0.0
+                    expanded_metrics[key].extend([last_value] * (32 - len(expanded_metrics[key])))
+            
+            all_rounds_metrics = expanded_metrics
+        
+        elif current_rounds < target_rounds:
             # Rellenar con valores promedio de las rondas existentes
             for key in all_rounds_metrics.keys():
                 if all_rounds_metrics[key]:
@@ -270,12 +306,9 @@ class FeatureExtractor:
                 missing_count = target_rounds - current_rounds
                 all_rounds_metrics[key].extend([avg_value] * missing_count)
         
-        elif current_rounds > target_rounds:
-            # TRUNCAR a 32 rondas - El modelo fue entrenado con 32 rondas
-            for key in all_rounds_metrics.keys():
-                all_rounds_metrics[key] = all_rounds_metrics[key][:target_rounds]
-        
-        # 4. ASIGNAR MÉTRICAS DE LAS 32 RONDAS (192 features)
+        # 4. ASIGNAR MÉTRICAS DE LAS 32 RONDAS EQUIVALENTES (192 features)
+        # Nota: Si el screening tiene 48 rondas, estas son 32 rondas promediadas
+        # que representan toda la información disponible
         for i in range(1, 33):
             idx = i - 1
             features_dict[f'Clicks{i}'] = all_rounds_metrics['clicks'][idx]
@@ -285,9 +318,11 @@ class FeatureExtractor:
             features_dict[f'Accuracy{i}'] = all_rounds_metrics['accuracy'][idx]
             features_dict[f'Missrate{i}'] = all_rounds_metrics['missrate'][idx]
         
-        # 5. CALCULAR FEATURES DERIVADAS (10 features)
+        # 5. CALCULAR FEATURES DERIVADAS (9 features)
+        # Estos se calculan usando todas las rondas disponibles
         derived = self._calculate_derived_features(all_rounds_metrics)
         features_dict.update(derived)
         
-        # 6. RETORNAR EN ORDEN EXACTO (206 features)
+        # 6. RETORNAR EN ORDEN EXACTO (205 features)
+        # 4 demográficas + 192 de rondas (32×6) + 9 derivadas = 205 total
         return [features_dict[name] for name in self.feature_names]

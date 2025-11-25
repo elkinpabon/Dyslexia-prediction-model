@@ -386,11 +386,11 @@ def evaluate_rounds():
     try:
         data = request.get_json()
         
-        print("📥 Datos recibidos en /activities/rounds/evaluate")
+        print("[RECV] Datos recibidos en /activities/rounds/evaluate")
         print(f"   Data es None: {data is None}")
         
         if not data:
-            print("❌ ERROR: No se recibieron datos")
+            print("[ERROR] No se recibieron datos")
             return Response.error("No se recibieron datos", 400)
         
         print(f"   Keys en data: {list(data.keys())}")
@@ -412,12 +412,15 @@ def evaluate_rounds():
         # Extraer características usando el FeatureExtractor correcto
         features = prediction_service.feature_extractor.combine_all_features(data)
         
-        # Verificar que tenemos 206 features
-        if len(features) != 206:
-            return Response.error(f"Error: se generaron {len(features)} features en lugar de 206", 500)
+        # Verificar que tenemos 205 features
+        if len(features) != 205:
+            return Response.error(f"Se esperaban 205 características, se recibieron {len(features)}", 400)
         
         # Realizar predicción
         result = prediction_service.predict(features)
+        
+        # Determinar si hay indicadores de dislexia (riesgo medio o alto)
+        has_indicators = result['risk_level'] in ['Medio', 'Alto']
         
         # Preparar datos para guardar
         test_result_data = {
@@ -425,7 +428,7 @@ def evaluate_rounds():
             'child_id': data.get('childId'),
             'activity_id': data['activities'][0].get('name', 'screening_test'),
             'activity_name': data['activities'][0].get('displayName', 'Prueba de Cribado'),
-            'result': "SÍ" if result['prediction'] == 1 else "NO",
+            'result': "SÍ" if has_indicators else "NO",
             'probability': round(result['probability'] * 100, 2),
             'confidence': round(result['confidence'] * 100, 2),
             'risk_level': result['risk_level'],
@@ -490,13 +493,14 @@ def evaluate_rounds():
             saved_result = db_service.create_test_result(test_result_data)
             print(f"✅ Resultado guardado en BD con ID: {saved_result.id}")
         except Exception as e:
-            print(f"⚠️  Error guardando en BD: {str(e)}")
+            print(f"[WARN] Error guardando en BD: {str(e)}")
             # No fallar la request si falla el guardado
         
-        # El modelo devuelve 1 para "Yes" (tiene dislexia) y 0 para "No" (no tiene dislexia)
+        # Resultado basado en si hay indicadores de dislexia (riesgo medio o alto)
+        has_indicators = test_result_data['risk_level'] in ['Medio', 'Alto']
         return Response.success(
             data={
-                "result": test_result_data['result'],
+                "result": "SÍ" if has_indicators else "NO",
                 "probability": test_result_data['probability'],
                 "confidence": test_result_data['confidence'],
                 "risk_level": test_result_data['risk_level'],
@@ -592,7 +596,7 @@ def children():
             
             user = db_service.get_user(user_id)
             if not user:
-                print(f"⚠️ Usuario {user_id} no existe, creando automáticamente...")
+                print(f"[WARN] Usuario {user_id} no existe, creando automáticamente...")
                 return Response.error(f"Usuario (tutor) con ID '{user_id}' no encontrado. Registra primero al tutor.", 404)
             
             # Crear el niño
@@ -600,7 +604,7 @@ def children():
             
             # Convertir a dict y retornar
             child_dict = child.to_dict()
-            print(f"✅ Retornando child_dict: {child_dict}")
+            print(f"[OK] Retornando child_dict: {child_dict}")
             
             return Response.success(
                 data=child_dict,
@@ -610,7 +614,7 @@ def children():
         except Exception as e:
             import traceback
             error_msg = traceback.format_exc()
-            print(f"❌ Error creando niño:\n{error_msg}")
+            print(f"[ERROR] Error creando niño:\n{error_msg}")
             return Response.error(f"Error creando niño: {str(e)}", 500)
 
 @api_bp.route('/children/<child_id>', methods=['GET', 'PUT', 'DELETE'])
