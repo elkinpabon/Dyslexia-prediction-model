@@ -5,7 +5,9 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8080 \
+    FLASK_ENV=production
 
 # Establecer directorio de trabajo
 WORKDIR /app
@@ -17,6 +19,7 @@ COPY requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libmariadb-dev \
+    curl \
     && pip install --upgrade pip setuptools wheel \
     && pip install -r requirements.txt \
     && apt-get clean \
@@ -27,10 +30,6 @@ COPY . .
 
 # Exponer el puerto 8080 (Cloud Run requiere 8080)
 EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/api/health', timeout=5)"
 
 # Comando para ejecutar la aplicación
 # Cloud Run ejecutará este comando
