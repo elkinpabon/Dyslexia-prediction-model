@@ -14,6 +14,9 @@ config = DevelopmentConfig if env == 'development' else ProductionConfig
 app = create_app(config)
 
 if __name__ == '__main__':
+    # Cloud Run requiere puerto 8080
+    port = int(os.getenv('PORT', 8080))
+    
     print(f"""
 ╔════════════════════════════════════════════════════════╗
 ║          DYSLEXIA DETECTION - ML BACKEND              ║
@@ -22,7 +25,7 @@ if __name__ == '__main__':
 
 Ambiente: {env}
 Debug: {app.debug}
-Puerto: 5000
+Puerto: {port}
 
 Endpoints:
   GET   /api/health           - Estado del servidor
@@ -30,12 +33,12 @@ Endpoints:
   POST  /api/predict          - Predicción individual
   POST  /api/predict/batch    - Predicciones en lote
 
-Acceder a: http://localhost:5000
+Acceder a: http://localhost:{port}
     """)
     
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=port,
         debug=app.debug,
         use_reloader=env == 'development'
     )
