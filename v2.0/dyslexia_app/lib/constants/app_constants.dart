@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 /// Constantes globales de la aplicación DyLexia Pro
 class AppConstants {
   // API Configuration
-  // IMPORTANTE: Usar IP local de la PC donde corre el backend (no localhost)
-  // Para encontrar tu IP: ipconfig (Windows) o ifconfig (Mac/Linux)
-  static const String apiBaseUrl = "http://192.168.1.53:5000/api";
+  // PRODUCCIÓN: Cloud Run Backend
+  static const String apiBaseUrl =
+      "https://dyslexia-backend-868299789925.us-east4.run.app/api";
   static const Duration apiTimeout = Duration(seconds: 30);
 
   // Activity IDs
